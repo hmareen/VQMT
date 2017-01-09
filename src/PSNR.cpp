@@ -24,14 +24,29 @@
 
 #include "PSNR.hpp"
 
+
 PSNR::PSNR(int h, int w) : Metric(h, w)
 {
 }
 
-float PSNR::compute(const cv::Mat& original, const cv::Mat& processed)
+float PSNR::compute(const cv::Mat& original, const cv::Mat& processed) {
+    cv::Mat tmp(height, width, CV_32F);
+    cv::subtract(original, processed, tmp);
+    cv::multiply(tmp, tmp, tmp);
+    return float(10 * log10(255 * 255 / cv::mean(tmp).val[0]));
+}
+
+float PSNR::compute_with_hist(const cv::Mat& original, const cv::Mat& processed, int* outputHistogram)
 {
 	cv::Mat tmp(height,width,CV_32F);
 	cv::subtract(original, processed, tmp);
+
+    // Extra: calculate histogram of changes
+    histogramMat(tmp, outputHistogram);
+
 	cv::multiply(tmp, tmp, tmp);
-	return float(10*log10(255*255/cv::mean(tmp).val[0]));
+    float psnr = float(10 * log10(255 * 255 / cv::mean(tmp).val[0]));
+    return psnr;
 }
+
+

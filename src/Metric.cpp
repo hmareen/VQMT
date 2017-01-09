@@ -35,6 +35,20 @@ Metric::~Metric()
 
 }
 
+void Metric::histogramMat(cv::Mat input, int* outputHistogram) {
+    int nVals = 256; // 8 bit: 2^8
+    float range[] = { 0, nVals };
+    const float* histRange = { range };
+    cv::Mat hist;
+    cv::calcHist(&input, 1, 0, cv::Mat(), // do not use mask
+        hist, 1, &nVals, &histRange);
+
+    for(int i = 0; i < nVals; i++) {
+        int binVal = hist.at<int>(0, i);
+        outputHistogram[i] = binVal;
+    }
+}
+
 void Metric::applyGaussianBlur(const cv::Mat& src, cv::Mat& dst, int ksize, double sigma)
 {
 	int invalid = (ksize-1)/2;

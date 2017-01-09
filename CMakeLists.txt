@@ -60,7 +60,12 @@ check_cxx_compiler_flag(-Wuseless-cast HAS_USELESS_CAST)
 check_cxx_compiler_flag(-Wlogical-op HAS_LOGICAL_OP)
 check_cxx_compiler_flag(-Wstrict-null-sentinel HAS_STRICT_NULL_SENTINEL)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Wformat=2 -Winit-self -Wmissing-include-dirs -Wswitch-default -Wfloat-equal -Wundef -Wshadow -Wcast-qual -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion  -Wmissing-declarations -Wredundant-decls -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -pipe")
+if(CMAKE_COMPILER_IS_GNUCXX)
+    message(STATUS "GCC detected, adding compile flags")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Wformat=2 -Winit-self -Wmissing-include-dirs -Wswitch-default -Wfloat-equal -Wundef -Wshadow -Wcast-qual -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion  -Wmissing-declarations -Wredundant-decls -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -pipe")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -pipe")
+endif(CMAKE_COMPILER_IS_GNUCXX)
 
 if(HAS_DOUBLE_PROMOTION)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdouble-promotion")
@@ -84,6 +89,7 @@ endif()
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -flto -DNDEBUG")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -g3 -ggdb3 -Wpadded -Wpacked")
 
+SET("OpenCV_DIR" "J:/Documenten/UGent/Thesis/Tools/opencv/build/x64/vc14")
 find_package(OpenCV REQUIRED)
 set(EXECUTABLE_NAME ${CMAKE_PROJECT_NAME})
 set(SRCS

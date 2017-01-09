@@ -93,11 +93,14 @@ enum Metrics {
 	METRIC_VIFP,
 	METRIC_PSNRHVS,
 	METRIC_PSNRHVSM,
-	METRIC_SIZE
+	METRIC_SIZE,
+    METRIC_PSNR_HIST
 };
 
 int main (int argc, const char *argv[])
 {
+    printf("Start VQMT\n");
+
 	// Check number of input parameters
 	if (argc < PARAM_SIZE) {
 		fprintf(stderr, "Check software usage: at least %d parameters are required.\n", PARAM_SIZE);
@@ -140,6 +143,8 @@ int main (int argc, const char *argv[])
 		if (strcmp(argv[i], "PSNR") == 0) {
 			sprintf(str, "%s_psnr.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_PSNR] = fopen(str, "w");
+            sprintf(str, "%s_psnr_hist.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_PSNR_HIST] = fopen(str, "w");
 		}
 		else if (strcmp(argv[i], "SSIM") == 0) {
 			sprintf(str, "%s_ssim.csv", argv[PARAM_RESULTS]);
@@ -192,6 +197,9 @@ int main (int argc, const char *argv[])
 	float result[METRIC_SIZE] = {0};
 	float result_avg[METRIC_SIZE] = {0};
 
+    int histBuffer[256];
+    int maxHistBuffer[256];
+
 	for (int frame=0; frame<nbframes; frame++) {
 		// Grab frame
 		if (!original->readOneFrame()) exit(EXIT_FAILURE);
@@ -201,7 +209,7 @@ int main (int argc, const char *argv[])
 
 		// Compute PSNR
 		if (result_file[METRIC_PSNR] != NULL) {
-			result[METRIC_PSNR] = psnr->compute(original_frame, processed_frame);
+            result[METRIC_PSNR] = psnr->compute_with_hist(original_frame, processed_frame, histBuffer);
 		}
 
 		// Compute SSIM and MS-SSIM
@@ -239,6 +247,17 @@ int main (int argc, const char *argv[])
 				fprintf(result_file[m], "%d,%.6f\n", frame, static_cast<double>(result[m]));
 			}
 		}
+
+        // Extra: print quality histogram + keep maximum
+        if(result_file[METRIC_PSNR_HIST] != NULL) {
+            fprintf(result_file[METRIC_PSNR_HIST], "%d", frame);
+            for(int i = 0; i < 256; i++) {
+                fprintf(result_file[METRIC_PSNR_HIST], ",%d", histBuffer[i]);
+                // Keep max
+                if(histBuffer[i] > maxHistBuffer[i]) maxHistBuffer[i] = histBuffer[i];
+            }
+            fprintf(result_file[METRIC_PSNR_HIST], "\n");
+        }
 	}
 
 	// Print average quality index to file
@@ -249,6 +268,15 @@ int main (int argc, const char *argv[])
 			fclose(result_file[m]);
 		}
 	}
+
+    // Extra: print max of quality histograms
+    if(result_file[METRIC_PSNR_HIST] != NULL) {
+        fprintf(result_file[METRIC_PSNR_HIST], "average");
+        for(int i = 0; i < 256; i++) {
+            fprintf(result_file[METRIC_PSNR_HIST], ",%d", maxHistBuffer[i]);
+        }
+        fprintf(result_file[METRIC_PSNR_HIST], "\n");
+    }
 
 	delete psnr;
 	delete ssim;
