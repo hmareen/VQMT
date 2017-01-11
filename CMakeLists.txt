@@ -89,7 +89,7 @@ endif()
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -flto -DNDEBUG")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -g3 -ggdb3 -Wpadded -Wpacked")
 
-SET("OpenCV_DIR" "J:/Documenten/UGent/Thesis/Tools/opencv/build/x64/vc14")
+SET("OpenCV_DIR" "J:/Documenten/UGent/Thesis/Tools/opencv/build/x64/vc14/lib")
 find_package(OpenCV REQUIRED)
 set(EXECUTABLE_NAME ${CMAKE_PROJECT_NAME})
 set(SRCS

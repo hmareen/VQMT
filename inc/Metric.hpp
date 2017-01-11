@@ -34,7 +34,7 @@ public:
 	Metric(int height, int width);
 	virtual ~Metric();
 	virtual float compute(const cv::Mat& original, const cv::Mat& processed) = 0;
-    void Metric::histogramMat(cv::Mat input, int* outputHistogram);
+    void histogramMat(cv::Mat input, int* outputHistogram);
 protected:
 	int height;
 	int width;

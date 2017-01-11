@@ -36,10 +36,11 @@ float PSNR::compute(const cv::Mat& original, const cv::Mat& processed) {
     return float(10 * log10(255 * 255 / cv::mean(tmp).val[0]));
 }
 
+// Computes the PSNR + computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
 float PSNR::compute_with_hist(const cv::Mat& original, const cv::Mat& processed, int* outputHistogram)
 {
 	cv::Mat tmp(height,width,CV_32F);
-	cv::subtract(original, processed, tmp);
+	cv::absdiff(original, processed, tmp);
 
     // Extra: calculate histogram of changes
     histogramMat(tmp, outputHistogram);

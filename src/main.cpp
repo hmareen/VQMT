@@ -4,6 +4,7 @@
 //              http://mmspg.epfl.ch
 // All rights reserved.
 // Author: Philippe Hanhart (philippe.hanhart@epfl.ch)
+// Adaptation by Hannes Mareen (hannes.mareen@ugent.be)
 //
 // Permission is hereby granted, without written agreement and without
 // license or royalty fees, to use, copy, modify, and distribute the
@@ -37,6 +38,7 @@
   Metrics: the list of metrics to use
    available metrics:
    - PSNR: Peak Signal-to-Noise Ratio (PNSR)
+   - PSNR_HIST: PSNR + Histogram of (absolute) differences (NEW by Hannes)
    - SSIM: Structural Similarity (SSIM)
    - MSSSIM: Multi-Scale Structural Similarity (MS-SSIM)
    - VIFP: Visual Information Fidelity, pixel domain version (VIFp)
@@ -87,20 +89,19 @@ enum Params {
 };
 
 enum Metrics {
-	METRIC_PSNR = 0,
-	METRIC_SSIM,
-	METRIC_MSSSIM,
-	METRIC_VIFP,
-	METRIC_PSNRHVS,
-	METRIC_PSNRHVSM,
-	METRIC_SIZE,
-    METRIC_PSNR_HIST
+    METRIC_PSNR = 0,
+    METRIC_SSIM,
+    METRIC_MSSSIM,
+    METRIC_VIFP,
+    METRIC_PSNRHVS,
+    METRIC_PSNRHVSM,
+    METRIC_SIZE_1_VALUE,
+    METRIC_PSNR_HIST,
+    METRIC_SIZE
 };
 
 int main (int argc, const char *argv[])
 {
-    printf("Start VQMT\n");
-
 	// Check number of input parameters
 	if (argc < PARAM_SIZE) {
 		fprintf(stderr, "Check software usage: at least %d parameters are required.\n", PARAM_SIZE);
@@ -143,9 +144,13 @@ int main (int argc, const char *argv[])
 		if (strcmp(argv[i], "PSNR") == 0) {
 			sprintf(str, "%s_psnr.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_PSNR] = fopen(str, "w");
+		}
+        else if(strcmp(argv[i], "PSNR_HIST") == 0) {
+            sprintf(str, "%s_psnr.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_PSNR] = fopen(str, "w");
             sprintf(str, "%s_psnr_hist.csv", argv[PARAM_RESULTS]);
             result_file[METRIC_PSNR_HIST] = fopen(str, "w");
-		}
+        }
 		else if (strcmp(argv[i], "SSIM") == 0) {
 			sprintf(str, "%s_ssim.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_SSIM] = fopen(str, "w");
@@ -181,11 +186,20 @@ int main (int argc, const char *argv[])
 	}
 
 	// Print header to file
-	for (int m=0; m<METRIC_SIZE; m++) {
+	for (int m=0; m<METRIC_SIZE_1_VALUE; m++) {
 		if (result_file[m] != NULL) {
 			fprintf(result_file[m], "frame,value\n");
 		}
 	}
+
+    // Extra: print header of quality histograms
+    if(result_file[METRIC_PSNR_HIST] != NULL) {
+        fprintf(result_file[METRIC_PSNR_HIST], "frame");
+        for(int i = 0; i < 256; i++) {
+            fprintf(result_file[METRIC_PSNR_HIST], ",%d", i);
+        }
+        fprintf(result_file[METRIC_PSNR_HIST], "\n");
+    }
 
 	PSNR *psnr     = new PSNR(height, width);
 	SSIM *ssim     = new SSIM(height, width);
@@ -194,11 +208,11 @@ int main (int argc, const char *argv[])
 	PSNRHVS *phvs  = new PSNRHVS(height, width);
 
 	cv::Mat original_frame(height,width,CV_32F), processed_frame(height,width,CV_32F);
-	float result[METRIC_SIZE] = {0};
-	float result_avg[METRIC_SIZE] = {0};
+	float result[METRIC_SIZE_1_VALUE] = {0};
+    float result_avg[METRIC_SIZE_1_VALUE] = { 0 };
 
-    int histBuffer[256];
-    int maxHistBuffer[256];
+    int histBuffer[256] = { 0 };
+    int maxHistBuffer[256] = { 0 };
 
 	for (int frame=0; frame<nbframes; frame++) {
 		// Grab frame
@@ -209,8 +223,14 @@ int main (int argc, const char *argv[])
 
 		// Compute PSNR
 		if (result_file[METRIC_PSNR] != NULL) {
-            result[METRIC_PSNR] = psnr->compute_with_hist(original_frame, processed_frame, histBuffer);
+            // New: compute psnr AND histogram of differences!
+            result[METRIC_PSNR] = psnr->compute(original_frame, processed_frame);
 		}
+
+        if(result_file[METRIC_PSNR_HIST] != NULL) {
+            // New: compute psnr AND histogram of differences!
+            result[METRIC_PSNR] = psnr->compute_with_hist(original_frame, processed_frame, histBuffer);
+        }
 
 		// Compute SSIM and MS-SSIM
 		if (result_file[METRIC_SSIM] != NULL && result_file[METRIC_MSSSIM] == NULL) {
@@ -241,7 +261,7 @@ int main (int argc, const char *argv[])
 		}
 
 		// Print quality index to file
-		for (int m=0; m<METRIC_SIZE; m++) {
+        for(int m = 0; m<METRIC_SIZE_1_VALUE; m++) {
 			if (result_file[m] != NULL) {
 				result_avg[m] += result[m];
 				fprintf(result_file[m], "%d,%.6f\n", frame, static_cast<double>(result[m]));
@@ -261,7 +281,7 @@ int main (int argc, const char *argv[])
 	}
 
 	// Print average quality index to file
-	for (int m=0; m<METRIC_SIZE; m++) {
+    for(int m = 0; m < METRIC_SIZE_1_VALUE; m++) {
 		if (result_file[m] != NULL) {
 			result_avg[m] /= static_cast<float>(nbframes);
 			fprintf(result_file[m], "average,%.6f", static_cast<double>(result_avg[m]));
@@ -271,7 +291,7 @@ int main (int argc, const char *argv[])
 
     // Extra: print max of quality histograms
     if(result_file[METRIC_PSNR_HIST] != NULL) {
-        fprintf(result_file[METRIC_PSNR_HIST], "average");
+        fprintf(result_file[METRIC_PSNR_HIST], "max");
         for(int i = 0; i < 256; i++) {
             fprintf(result_file[METRIC_PSNR_HIST], ",%d", maxHistBuffer[i]);
         }

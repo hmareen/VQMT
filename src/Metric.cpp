@@ -35,6 +35,7 @@ Metric::~Metric()
 
 }
 
+// Computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
 void Metric::histogramMat(cv::Mat input, int* outputHistogram) {
     int nVals = 256; // 8 bit: 2^8
     float range[] = { 0, nVals };
@@ -44,7 +45,7 @@ void Metric::histogramMat(cv::Mat input, int* outputHistogram) {
         hist, 1, &nVals, &histRange);
 
     for(int i = 0; i < nVals; i++) {
-        int binVal = hist.at<int>(0, i);
+        int binVal = (int)hist.at<float>(0, i);
         outputHistogram[i] = binVal;
     }
 }
