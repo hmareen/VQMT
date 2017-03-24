@@ -75,6 +75,7 @@
 #include "MSSSIM.hpp"
 #include "VIFP.hpp"
 #include "PSNRHVS.hpp"
+#include "CORRELATION.hpp"
 
 enum Params {
 	PARAM_ORIGINAL = 1,	// Original video stream (YUV)
@@ -85,7 +86,7 @@ enum Params {
 	PARAM_CHROMA,		// Chroma format
 	PARAM_RESULTS,		// Output file for results
 	PARAM_METRICS,		// Metric(s) to compute
-	PARAM_SIZE
+    PARAM_SIZE
 };
 
 enum Metrics {
@@ -95,6 +96,7 @@ enum Metrics {
     METRIC_VIFP,
     METRIC_PSNRHVS,
     METRIC_PSNRHVSM,
+    METRIC_CORRELATION,
     METRIC_SIZE_1_VALUE,
     METRIC_PSNR_HIST,
     METRIC_SIZE
@@ -170,7 +172,11 @@ int main (int argc, const char *argv[])
 		else if (strcmp(argv[i], "PSNRHVSM") == 0) {
 			sprintf(str, "%s_psnrhvsm.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_PSNRHVSM] = fopen(str, "w");
-		}
+        }
+        else if(strcmp(argv[i], "CORRELATION") == 0) {
+            sprintf(str, "%s_corr.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_CORRELATION] = fopen(str, "w");
+        }
 	}
 	delete[] str;
 
@@ -206,8 +212,9 @@ int main (int argc, const char *argv[])
 	MSSSIM *msssim = new MSSSIM(height, width);
 	VIFP *vifp     = new VIFP(height, width);
 	PSNRHVS *phvs  = new PSNRHVS(height, width);
+    CORRELATION *correlation = new CORRELATION(height, width);
 
-	cv::Mat original_frame(height,width,CV_32F), processed_frame(height,width,CV_32F);
+    cv::Mat original_frame(height, width, CV_32F), processed_frame(height, width, CV_32F);
 	float result[METRIC_SIZE_1_VALUE] = {0};
     float result_avg[METRIC_SIZE_1_VALUE] = { 0 };
 
@@ -223,7 +230,6 @@ int main (int argc, const char *argv[])
 
 		// Compute PSNR
 		if (result_file[METRIC_PSNR] != NULL) {
-            // New: compute psnr AND histogram of differences!
             result[METRIC_PSNR] = psnr->compute(original_frame, processed_frame);
 		}
 
@@ -260,6 +266,11 @@ int main (int argc, const char *argv[])
 			}
 		}
 
+        if(result_file[METRIC_CORRELATION] != NULL) {
+            // New: compute correlation (after subtracting frame)
+            result[METRIC_CORRELATION] = correlation->compute(original_frame, processed_frame);
+        }
+
 		// Print quality index to file
         for(int m = 0; m<METRIC_SIZE_1_VALUE; m++) {
 			if (result_file[m] != NULL) {
@@ -278,6 +289,7 @@ int main (int argc, const char *argv[])
             }
             fprintf(result_file[METRIC_PSNR_HIST], "\n");
         }
+
 	}
 
 	// Print average quality index to file
