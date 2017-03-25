@@ -80,6 +80,7 @@
 enum Params {
 	PARAM_ORIGINAL = 1,	// Original video stream (YUV)
 	PARAM_PROCESSED,	// Processed video stream (YUV)
+    PARAM_SUBTRACT,     // Video stream to subtract from both (YUV) (or " " if nothing to subtract)
 	PARAM_HEIGHT,		// Height
 	PARAM_WIDTH,		// Width
 	PARAM_NBFRAMES,		// Number of frames
@@ -96,7 +97,9 @@ enum Metrics {
     METRIC_VIFP,
     METRIC_PSNRHVS,
     METRIC_PSNRHVSM,
-    METRIC_CORRELATION,
+    METRIC_CORRELATION_LIN,
+    METRIC_CORRELATION_NORM,
+    METRIC_CORRELATION_COEF,
     METRIC_SIZE_1_VALUE,
     METRIC_PSNR_HIST,
     METRIC_SIZE
@@ -139,6 +142,11 @@ int main (int argc, const char *argv[])
 	VideoYUV *original  = new VideoYUV(argv[PARAM_ORIGINAL], height, width, nbframes, chroma);
 	VideoYUV *processed = new VideoYUV(argv[PARAM_PROCESSED], height, width, nbframes, chroma);
 
+    VideoYUV *subtract;
+    if(strlen(argv[PARAM_SUBTRACT]) > 1) {
+        subtract = new VideoYUV(argv[PARAM_SUBTRACT], height, width, nbframes, chroma);
+    }
+
 	// Output files for results
 	FILE *result_file[METRIC_SIZE] = {NULL};
 	char *str = new char[256];
@@ -173,9 +181,17 @@ int main (int argc, const char *argv[])
 			sprintf(str, "%s_psnrhvsm.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_PSNRHVSM] = fopen(str, "w");
         }
-        else if(strcmp(argv[i], "CORRELATION") == 0) {
-            sprintf(str, "%s_corr.csv", argv[PARAM_RESULTS]);
-            result_file[METRIC_CORRELATION] = fopen(str, "w");
+        else if(strcmp(argv[i], "CORRELATION_LIN") == 0) {
+            sprintf(str, "%s_corr_lin.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_CORRELATION_LIN] = fopen(str, "w");
+        }
+        else if(strcmp(argv[i], "CORRELATION_NORM") == 0) {
+            sprintf(str, "%s_corr_norm.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_CORRELATION_NORM] = fopen(str, "w");
+        }
+        else if(strcmp(argv[i], "CORRELATION_COEF") == 0) {
+            sprintf(str, "%s_corr_coef.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_CORRELATION_COEF] = fopen(str, "w");
         }
 	}
 	delete[] str;
@@ -215,6 +231,7 @@ int main (int argc, const char *argv[])
     CORRELATION *correlation = new CORRELATION(height, width);
 
     cv::Mat original_frame(height, width, CV_32F), processed_frame(height, width, CV_32F);
+    cv::Mat subtract_frame(height, width, CV_32F);
 	float result[METRIC_SIZE_1_VALUE] = {0};
     float result_avg[METRIC_SIZE_1_VALUE] = { 0 };
 
@@ -227,6 +244,10 @@ int main (int argc, const char *argv[])
 		original->getLuma(original_frame, CV_32F);
 		if (!processed->readOneFrame()) exit(EXIT_FAILURE);
 		processed->getLuma(processed_frame, CV_32F);
+        if(strlen(argv[PARAM_SUBTRACT]) > 1) {
+            if(!subtract->readOneFrame()) exit(EXIT_FAILURE);
+            subtract->getLuma(subtract_frame, CV_32F);
+        }
 
 		// Compute PSNR
 		if (result_file[METRIC_PSNR] != NULL) {
@@ -266,9 +287,22 @@ int main (int argc, const char *argv[])
 			}
 		}
 
-        if(result_file[METRIC_CORRELATION] != NULL) {
-            // New: compute correlation (after subtracting frame)
-            result[METRIC_CORRELATION] = correlation->compute(original_frame, processed_frame);
+        if(result_file[METRIC_CORRELATION_LIN] != NULL) {
+            // New: compute linear correlation
+            //result[METRIC_CORRELATION_LIN] = correlation->compute_correlation_linear(original_frame, processed_frame);
+            result[METRIC_CORRELATION_LIN] = correlation->compute_correlation_linear_subtract(original_frame, processed_frame, subtract_frame);
+        }
+
+        if(result_file[METRIC_CORRELATION_NORM] != NULL) {
+            // New: compute normalized correlation
+            //result[METRIC_CORRELATION_NORM] = correlation->compute_correlation_normalized(original_frame, processed_frame);
+            result[METRIC_CORRELATION_NORM] = correlation->compute_correlation_normalized_subtract(original_frame, processed_frame, subtract_frame);
+        }
+
+        if(result_file[METRIC_CORRELATION_COEF] != NULL) {
+            // New: compute correlation coefficient
+            //result[METRIC_CORRELATION_COEF] = correlation->compute_correlation_coefficient(original_frame, processed_frame);
+            result[METRIC_CORRELATION_COEF] = correlation->compute_correlation_coefficient_subtract(original_frame, processed_frame, subtract_frame);
         }
 
 		// Print quality index to file
