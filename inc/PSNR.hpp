@@ -39,7 +39,8 @@ public:
 	// Compute the PSNR index of the processed image
     float compute(const cv::Mat& original, const cv::Mat& processed);
     // Compute the PSNR index of the processed image + distribution
-	float compute_with_hist(const cv::Mat& original, const cv::Mat& processed, int* outputHistogram);
+	void compute_with_hist(const cv::Mat& original, const cv::Mat& processed, int* outputHistogram);
+    void compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& subtract, int* outputHistogram);
 };
 
 #endif

@@ -37,17 +37,23 @@ float PSNR::compute(const cv::Mat& original, const cv::Mat& processed) {
 }
 
 // Computes the PSNR + computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
-float PSNR::compute_with_hist(const cv::Mat& original, const cv::Mat& processed, int* outputHistogram)
-{
+void PSNR::compute_with_hist(const cv::Mat& original, const cv::Mat& processed, int* outputHistogram) {
 	cv::Mat tmp(height,width,CV_32F);
 	cv::absdiff(original, processed, tmp);
 
     // Extra: calculate histogram of changes
     histogramMat(tmp, outputHistogram);
-
-	cv::multiply(tmp, tmp, tmp);
-    float psnr = float(10 * log10(255 * 255 / cv::mean(tmp).val[0]));
-    return psnr;
 }
 
+// Computes the PSNR + computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
+void PSNR::compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& unwatermarked, int* outputHistogram) {
+    cv::Mat tmp_processed(height, width, CV_32F);
+    cv::Mat tmp_unwatermarked(height, width, CV_32F);
+    cv::subtract(original, processed, tmp_processed);
+    cv::subtract(original, unwatermarked, tmp_unwatermarked);
+
+    cv::absdiff(tmp_processed, tmp_unwatermarked, tmp_processed);
+    // Extra: calculate histogram of changes
+    histogramMat(tmp_processed, outputHistogram);
+}
 
