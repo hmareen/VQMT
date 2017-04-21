@@ -35,19 +35,47 @@ Metric::~Metric()
 
 }
 
-// Computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
-void Metric::histogramMat(cv::Mat input, int* outputHistogram) {
-    int nVals = 256; // 8 bit: 2^8
-    float range[] = { 0, nVals };
+void Metric::histogram(cv::Mat input, int* outputHistogram, float lowerRange, float upperRange, int histSize) {
+    float range[] = { lowerRange, upperRange };
     const float* histRange = { range };
     cv::Mat hist;
     cv::calcHist(&input, 1, 0, cv::Mat(), // do not use mask
-        hist, 1, &nVals, &histRange);
+        hist, 1, &histSize, &histRange);
 
-    for(int i = 0; i < nVals; i++) {
+    for(int i = 0; i < histSize; i++) {
         int binVal = (int)hist.at<float>(0, i);
         outputHistogram[i] = binVal;
     }
+}
+
+// Computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
+void Metric::histogramMat(cv::Mat input, int* outputHistogram) {
+    int nVals = 256;
+    float lowerRange = 0.0;
+    float upperRange = (float) nVals;
+    int histSize = nVals;
+    histogram(input, outputHistogram, lowerRange, upperRange, histSize); // 8 bit: 2^8 = 256
+}
+
+// Computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of -255-differences, etc.)
+// + in both negative and positive direction
+void Metric::histogramMatDiff(cv::Mat input, int* outputHistogram) {
+    int nVals = 256;
+    float lowerRange = -(float)nVals + 1.0;
+    float upperRange = (float)nVals;
+    int histSize = (nVals * 2) - 1;
+    histogram(input, outputHistogram, lowerRange, upperRange, histSize); // 8 bit: 2^8 = 256    
+}
+
+// Computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of -1-differences, etc.)
+// + in both negative and positive direction
+// + in range [-1.0, 1.0]
+void Metric::histogramMatDiffFloat(cv::Mat input, int* outputHistogram, int amountOfBins) {
+    int nVals = amountOfBins;
+    float lowerRange = -1.0;
+    float upperRange = 1.0;
+    int histSize = nVals * 2;
+    histogram(input, outputHistogram, lowerRange, upperRange, histSize); // 8 bit: 2^8 = 256    
 }
 
 void Metric::applyGaussianBlur(const cv::Mat& src, cv::Mat& dst, int ksize, double sigma)

@@ -112,3 +112,71 @@ cv::Scalar SSIM::computeSSIM(const cv::Mat& img1, const cv::Mat& img2)
 
 	return res;
 }
+
+// Copy paste from above, only returning ssim_map
+void SSIM::computeSSIMMap(const cv::Mat& img1, const cv::Mat& img2, const cv::Mat& ssim_map) {
+
+    int ht = img1.rows;
+    int wt = img1.cols;
+    int w = wt - 10;
+    int h = ht - 10;
+
+    cv::Mat mu1(h, w, CV_32F), mu2(h, w, CV_32F);
+    cv::Mat mu1_sq(h, w, CV_32F), mu2_sq(h, w, CV_32F), mu1_mu2(h, w, CV_32F);
+    cv::Mat img1_sq(ht, wt, CV_32F), img2_sq(ht, wt, CV_32F), img1_img2(ht, wt, CV_32F);
+    cv::Mat sigma1_sq(h, w, CV_32F), sigma2_sq(h, w, CV_32F), sigma12(h, w, CV_32F);
+    cv::Mat tmp1(h, w, CV_32F), tmp2(h, w, CV_32F), tmp3(h, w, CV_32F);
+    cv::Mat cs_map(h, w, CV_32F);
+
+    // mu1 = filter2(window, img1, 'valid');
+    applyGaussianBlur(img1, mu1, 11, 1.5);
+
+    // mu2 = filter2(window, img2, 'valid');
+    applyGaussianBlur(img2, mu2, 11, 1.5);
+
+    // mu1_sq = mu1.*mu1;
+    cv::multiply(mu1, mu1, mu1_sq);
+    // mu2_sq = mu2.*mu2;
+    cv::multiply(mu2, mu2, mu2_sq);
+    // mu1_mu2 = mu1.*mu2;
+    cv::multiply(mu1, mu2, mu1_mu2);
+
+    cv::multiply(img1, img1, img1_sq);
+    cv::multiply(img2, img2, img2_sq);
+    cv::multiply(img1, img2, img1_img2);
+
+    // sigma1_sq = filter2(window, img1.*img1, 'valid') - mu1_sq;
+    applyGaussianBlur(img1_sq, sigma1_sq, 11, 1.5);
+    sigma1_sq -= mu1_sq;
+
+    // sigma2_sq = filter2(window, img2.*img2, 'valid') - mu2_sq;
+    applyGaussianBlur(img2_sq, sigma2_sq, 11, 1.5);
+    sigma2_sq -= mu2_sq;
+
+    // sigma12 = filter2(window, img1.*img2, 'valid') - mu1_mu2;
+    applyGaussianBlur(img1_img2, sigma12, 11, 1.5);
+    sigma12 -= mu1_mu2;
+
+    // cs_map = (2*sigma12 + C2)./(sigma1_sq + sigma2_sq + C2);
+    tmp1 = 2 * sigma12 + C2;
+    tmp2 = sigma1_sq + sigma2_sq + C2;
+    cv::divide(tmp1, tmp2, cs_map);
+    // ssim_map = ((2*mu1_mu2 + C1).*(2*sigma12 + C2))./((mu1_sq + mu2_sq + C1).*(sigma1_sq + sigma2_sq + C2));
+    tmp3 = 2 * mu1_mu2 + C1;
+    cv::multiply(tmp1, tmp3, tmp1);
+    tmp3 = mu1_sq + mu2_sq + C1;
+    cv::multiply(tmp2, tmp3, tmp2);
+    cv::divide(tmp1, tmp2, ssim_map);
+}
+
+// Computes the PSNR + computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
+void SSIM::compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& unwatermarked, int* outputHistogram, int amountOfBins) {
+    cv::Mat ssim_map_unwatermarked(height-10, width-10, CV_32F);
+    cv::Mat ssim_map_watermarked(height-10, width-10, CV_32F);
+    computeSSIMMap(processed, original, ssim_map_watermarked);
+    computeSSIMMap(unwatermarked, original, ssim_map_unwatermarked);
+
+    cv::subtract(ssim_map_watermarked, ssim_map_unwatermarked, ssim_map_watermarked);
+    // Extra: calculate histogram of changes
+    histogramMatDiffFloat(ssim_map_watermarked, outputHistogram, amountOfBins);
+}

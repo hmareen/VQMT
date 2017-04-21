@@ -34,7 +34,10 @@ public:
 	Metric(int height, int width);
 	virtual ~Metric();
 	virtual float compute(const cv::Mat& original, const cv::Mat& processed) = 0;
+    void histogram(cv::Mat input, int* outputHistogram, float lowerRange, float upperRange, int histSize);
     void histogramMat(cv::Mat input, int* outputHistogram);
+    void histogramMatDiff(cv::Mat input, int* outputHistogram);
+    void histogramMatDiffFloat(cv::Mat input, int* outputHistogram, int amountOfBins);
 protected:
 	int height;
 	int width;

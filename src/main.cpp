@@ -38,7 +38,7 @@
   Metrics: the list of metrics to use
    available metrics:
    - PSNR: Peak Signal-to-Noise Ratio (PNSR)
-   - PSNR_HIST: PSNR + Histogram of (absolute) differences (NEW by Hannes)
+   - HIST: PSNR + Histogram of (absolute) differences (NEW by Hannes)
    - SSIM: Structural Similarity (SSIM)
    - MSSSIM: Multi-Scale Structural Similarity (MS-SSIM)
    - VIFP: Visual Information Fidelity, pixel domain version (VIFp)
@@ -100,9 +100,13 @@ enum Metrics {
     METRIC_CORRELATION_LIN,
     METRIC_CORRELATION_NORM,
     METRIC_CORRELATION_COEF,
+    METRIC_CORRELATION_LIN_NO_SUB,
+    METRIC_CORRELATION_NORM_NO_SUB,
+    METRIC_CORRELATION_COEF_NO_SUB,
     METRIC_SIZE_1_VALUE,
-    METRIC_PSNR_HIST,
-    METRIC_PSNR_HIST_SUB,
+    METRIC_HIST,
+    METRIC_HIST_DIFF,
+    METRIC_SSIM_HIST_DIFF,
     METRIC_SIZE
 };
 
@@ -156,13 +160,13 @@ int main (int argc, const char *argv[])
 			sprintf(str, "%s_psnr.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_PSNR] = fopen(str, "w");
 		}
-        else if(strcmp(argv[i], "PSNR_HIST") == 0) {
-            sprintf(str, "%s_psnr_hist.csv", argv[PARAM_RESULTS]);
-            result_file[METRIC_PSNR_HIST] = fopen(str, "w");
+        else if(strcmp(argv[i], "HIST") == 0) {
+            sprintf(str, "%s_hist.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_HIST] = fopen(str, "w");
         }
-        else if(strcmp(argv[i], "PSNR_HIST_SUB") == 0) {
-            sprintf(str, "%s_psnr_hist_sub.csv", argv[PARAM_RESULTS]);
-            result_file[METRIC_PSNR_HIST_SUB] = fopen(str, "w");
+        else if(strcmp(argv[i], "HIST_DIFF") == 0) {
+            sprintf(str, "%s_hist_diff.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_HIST_DIFF] = fopen(str, "w");
         }
 		else if (strcmp(argv[i], "SSIM") == 0) {
 			sprintf(str, "%s_ssim.csv", argv[PARAM_RESULTS]);
@@ -172,6 +176,10 @@ int main (int argc, const char *argv[])
 			sprintf(str, "%s_msssim.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_MSSSIM] = fopen(str, "w");
 		}
+        else if(strcmp(argv[i], "SSIM_HIST_DIFF") == 0) {
+            sprintf(str, "%s_ssim_hist_diff.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_SSIM_HIST_DIFF] = fopen(str, "w");
+        }
 		else if (strcmp(argv[i], "VIFP") == 0) {
 			sprintf(str, "%s_vifp.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_VIFP] = fopen(str, "w");
@@ -196,6 +204,16 @@ int main (int argc, const char *argv[])
             sprintf(str, "%s_corr_coef.csv", argv[PARAM_RESULTS]);
             result_file[METRIC_CORRELATION_COEF] = fopen(str, "w");
         }
+        else if(strcmp(argv[i], "CORRELATION_LIN_NO_SUB") == 0) {
+            sprintf(str, "%s_corr_lin_no_sub.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_CORRELATION_LIN_NO_SUB] = fopen(str, "w");
+        } else if(strcmp(argv[i], "CORRELATION_NORM_NO_SUB") == 0) {
+            sprintf(str, "%s_corr_norm_no_sub.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_CORRELATION_NORM_NO_SUB] = fopen(str, "w");
+        } else if(strcmp(argv[i], "CORRELATION_COEF_NO_SUB") == 0) {
+            sprintf(str, "%s_corr_coef_no_sub.csv", argv[PARAM_RESULTS]);
+            result_file[METRIC_CORRELATION_COEF_NO_SUB] = fopen(str, "w");
+        }
 	}
 	delete[] str;
 
@@ -218,12 +236,30 @@ int main (int argc, const char *argv[])
 	}
 
     // Extra: print header of quality histograms
-    if(result_file[METRIC_PSNR_HIST] != NULL) {
-        fprintf(result_file[METRIC_PSNR_HIST], "frame");
+    if(result_file[METRIC_HIST] != NULL) {
+        fprintf(result_file[METRIC_HIST], "frame");
         for(int i = 0; i < 256; i++) {
-            fprintf(result_file[METRIC_PSNR_HIST], ",%d", i);
+            fprintf(result_file[METRIC_HIST], ",%d", i);
         }
-        fprintf(result_file[METRIC_PSNR_HIST], "\n");
+        fprintf(result_file[METRIC_HIST], "\n");
+    }
+
+    if(result_file[METRIC_HIST_DIFF] != NULL) {
+        fprintf(result_file[METRIC_HIST_DIFF], "frame");
+        for(int i = -255; i < 256; i++) {
+            fprintf(result_file[METRIC_HIST_DIFF], ",%d", i);
+        }
+        fprintf(result_file[METRIC_HIST_DIFF], "\n");
+    }
+
+
+    const int amountOfSSIMBins = 20;
+    if(result_file[METRIC_SSIM_HIST_DIFF] != NULL) {
+        fprintf(result_file[METRIC_SSIM_HIST_DIFF], "frame");
+        for(float i = 0; i < amountOfSSIMBins*2; i ++) {
+            fprintf(result_file[METRIC_SSIM_HIST_DIFF], ",%f", (-1.0 + i * 1.0/amountOfSSIMBins));
+        }
+        fprintf(result_file[METRIC_SSIM_HIST_DIFF], "\n");
     }
 
 	PSNR *psnr     = new PSNR(height, width);
@@ -240,8 +276,10 @@ int main (int argc, const char *argv[])
 
     int histBuffer[256] = { 0 };
     int maxHistBuffer[256] = { 0 };
-    int histSubBuffer[256] = { 0 };
-    int maxHistSubBuffer[256] = { 0 };
+    int histSubBuffer[511] = { 0 };
+    int maxHistSubBuffer[511] = { 0 };
+    int histSSIMSubBuffer[amountOfSSIMBins * 2] = { 0 };
+    int maxHistSSIMSubBuffer[amountOfSSIMBins * 2] = { 0 };
 	for (int frame=0; frame<nbframes; frame++) {
 		// Grab frame
 		if (!original->readOneFrame()) exit(EXIT_FAILURE);
@@ -258,12 +296,12 @@ int main (int argc, const char *argv[])
             result[METRIC_PSNR] = psnr->compute(original_frame, processed_frame);
 		}
 
-        if(result_file[METRIC_PSNR_HIST] != NULL) {
+        if(result_file[METRIC_HIST] != NULL) {
             // New: compute histogram of differences!
             psnr->compute_with_hist(original_frame, processed_frame, histBuffer);
         }
 
-        if(result_file[METRIC_PSNR_HIST_SUB] != NULL) {
+        if(result_file[METRIC_HIST_DIFF] != NULL) {
             // New: compute histogram of differences of (difference orig - processed) - (difference orig - unwatermarked)! 
             psnr->compute_with_hist_sub(original_frame, processed_frame, subtract_frame, histSubBuffer);
         }
@@ -279,6 +317,11 @@ int main (int argc, const char *argv[])
 			}
 			result[METRIC_MSSSIM] = msssim->getMSSSIM();
 		}
+
+        if(result_file[METRIC_SSIM_HIST_DIFF] != NULL) {
+            // New: compute histogram of SSIM differences of (orig - processed) - (orig - unwatermarked)! 
+            ssim->compute_with_hist_sub(original_frame, processed_frame, subtract_frame, histSSIMSubBuffer, amountOfSSIMBins);
+        }
 
 		// Compute VIFp
 		if (result_file[METRIC_VIFP] != NULL) {
@@ -298,20 +341,32 @@ int main (int argc, const char *argv[])
 
         if(result_file[METRIC_CORRELATION_LIN] != NULL) {
             // New: compute linear correlation
-            result[METRIC_CORRELATION_LIN] = correlation->compute_correlation_linear(original_frame, processed_frame);
-            //result[METRIC_CORRELATION_LIN] = correlation->compute_correlation_linear_subtract(original_frame, processed_frame, subtract_frame);
+            result[METRIC_CORRELATION_LIN] = correlation->compute_correlation_linear_subtract(original_frame, processed_frame, subtract_frame);
         }
 
         if(result_file[METRIC_CORRELATION_NORM] != NULL) {
             // New: compute normalized correlation
-            result[METRIC_CORRELATION_NORM] = correlation->compute_correlation_normalized(original_frame, processed_frame);
-            //result[METRIC_CORRELATION_NORM] = correlation->compute_correlation_normalized_subtract(original_frame, processed_frame, subtract_frame);
+            result[METRIC_CORRELATION_NORM] = correlation->compute_correlation_normalized_subtract(original_frame, processed_frame, subtract_frame);
         }
 
         if(result_file[METRIC_CORRELATION_COEF] != NULL) {
             // New: compute correlation coefficient
-            result[METRIC_CORRELATION_COEF] = correlation->compute_correlation_coefficient(original_frame, processed_frame);
-            //result[METRIC_CORRELATION_COEF] = correlation->compute_correlation_coefficient_subtract(original_frame, processed_frame, subtract_frame);
+            result[METRIC_CORRELATION_COEF] = correlation->compute_correlation_coefficient_subtract(original_frame, processed_frame, subtract_frame);
+        }
+
+        if(result_file[METRIC_CORRELATION_LIN_NO_SUB] != NULL) {
+            // New: compute linear correlation (no sub)
+            result[METRIC_CORRELATION_LIN_NO_SUB] = correlation->compute_correlation_linear(original_frame, processed_frame);
+        }
+
+        if(result_file[METRIC_CORRELATION_NORM_NO_SUB] != NULL) {
+            // New: compute normalized correlation (no sub)
+            result[METRIC_CORRELATION_NORM_NO_SUB] = correlation->compute_correlation_normalized(original_frame, processed_frame);
+        }
+
+        if(result_file[METRIC_CORRELATION_COEF_NO_SUB] != NULL) {
+            // New: compute correlation coefficient (no sub)
+            result[METRIC_CORRELATION_COEF_NO_SUB] = correlation->compute_correlation_coefficient(original_frame, processed_frame);
         }
 
 		// Print quality index to file
@@ -323,25 +378,36 @@ int main (int argc, const char *argv[])
 		}
 
         // Extra: print quality histogram to file
-        if(result_file[METRIC_PSNR_HIST] != NULL) {
-            fprintf(result_file[METRIC_PSNR_HIST], "%d", frame);
+        if(result_file[METRIC_HIST] != NULL) {
+            fprintf(result_file[METRIC_HIST], "%d", frame);
             for(int i = 0; i < 256; i++) {
-                fprintf(result_file[METRIC_PSNR_HIST], ",%d", histBuffer[i]);
+                fprintf(result_file[METRIC_HIST], ",%d", histBuffer[i]);
                 // Keep max
                 if(histBuffer[i] > maxHistBuffer[i]) maxHistBuffer[i] = histBuffer[i];
             }
-            fprintf(result_file[METRIC_PSNR_HIST], "\n");
+            fprintf(result_file[METRIC_HIST], "\n");
         }
 
         // Extra: print quality histogram sub to file
-        if(result_file[METRIC_PSNR_HIST_SUB] != NULL) {
-            fprintf(result_file[METRIC_PSNR_HIST_SUB], "%d", frame);
-            for(int i = 0; i < 256; i++) {
-                fprintf(result_file[METRIC_PSNR_HIST_SUB], ",%d", histSubBuffer[i]);
+        if(result_file[METRIC_HIST_DIFF] != NULL) {
+            fprintf(result_file[METRIC_HIST_DIFF], "%d", frame);
+            for(int i = 0; i < 511; i++) {
+                fprintf(result_file[METRIC_HIST_DIFF], ",%d", histSubBuffer[i]);
                 // Keep max
                 if(histSubBuffer[i] > maxHistSubBuffer[i]) maxHistSubBuffer[i] = histSubBuffer[i];
             }
-            fprintf(result_file[METRIC_PSNR_HIST_SUB], "\n");
+            fprintf(result_file[METRIC_HIST_DIFF], "\n");
+        }
+
+        // Extra: print quality histogram sub to file
+        if(result_file[METRIC_SSIM_HIST_DIFF] != NULL) {
+            fprintf(result_file[METRIC_SSIM_HIST_DIFF], "%d", frame);
+            for(int i = 0; i < amountOfSSIMBins*2; i++) {
+                fprintf(result_file[METRIC_SSIM_HIST_DIFF], ",%d", histSSIMSubBuffer[i]);
+                // Keep max
+                if(histSSIMSubBuffer[i] > maxHistSSIMSubBuffer[i]) maxHistSSIMSubBuffer[i] = histSSIMSubBuffer[i];
+            }
+            fprintf(result_file[METRIC_SSIM_HIST_DIFF], "\n");
         }
 	}
 
@@ -355,21 +421,30 @@ int main (int argc, const char *argv[])
 	}
 
     // Extra: print max of quality histograms
-    if(result_file[METRIC_PSNR_HIST] != NULL) {
-        fprintf(result_file[METRIC_PSNR_HIST], "max");
+    if(result_file[METRIC_HIST] != NULL) {
+        fprintf(result_file[METRIC_HIST], "max");
         for(int i = 0; i < 256; i++) {
-            fprintf(result_file[METRIC_PSNR_HIST], ",%d", maxHistBuffer[i]);
+            fprintf(result_file[METRIC_HIST], ",%d", maxHistBuffer[i]);
         }
-        fprintf(result_file[METRIC_PSNR_HIST], "\n");
+        fprintf(result_file[METRIC_HIST], "\n");
     }
 
     // Extra: print max of quality histograms sub
-    if(result_file[METRIC_PSNR_HIST_SUB] != NULL) {
-        fprintf(result_file[METRIC_PSNR_HIST_SUB], "max");
-        for(int i = 0; i < 256; i++) {
-            fprintf(result_file[METRIC_PSNR_HIST_SUB], ",%d", maxHistSubBuffer[i]);
+    if(result_file[METRIC_HIST_DIFF] != NULL) {
+        fprintf(result_file[METRIC_HIST_DIFF], "max");
+        for(int i = 0; i < 511; i++) {
+            fprintf(result_file[METRIC_HIST_DIFF], ",%d", maxHistSubBuffer[i]);
         }
-        fprintf(result_file[METRIC_PSNR_HIST_SUB], "\n");
+        fprintf(result_file[METRIC_HIST_DIFF], "\n");
+    }
+
+    // Extra: print max of quality histograms sub
+    if(result_file[METRIC_SSIM_HIST_DIFF] != NULL) {
+        fprintf(result_file[METRIC_SSIM_HIST_DIFF], "max");
+        for(int i = 0; i < amountOfSSIMBins*2; i++) {
+            fprintf(result_file[METRIC_SSIM_HIST_DIFF], ",%d", maxHistSSIMSubBuffer[i]);
+        }
+        fprintf(result_file[METRIC_SSIM_HIST_DIFF], "\n");
     }
 
 	delete psnr;

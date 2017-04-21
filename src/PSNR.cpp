@@ -49,11 +49,11 @@ void PSNR::compute_with_hist(const cv::Mat& original, const cv::Mat& processed, 
 void PSNR::compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& unwatermarked, int* outputHistogram) {
     cv::Mat tmp_processed(height, width, CV_32F);
     cv::Mat tmp_unwatermarked(height, width, CV_32F);
-    cv::subtract(original, processed, tmp_processed);
-    cv::subtract(original, unwatermarked, tmp_unwatermarked);
+    cv::subtract(processed, original, tmp_processed);
+    cv::subtract(unwatermarked, original, tmp_unwatermarked);
 
-    cv::absdiff(tmp_processed, tmp_unwatermarked, tmp_processed);
+    cv::subtract(tmp_processed, tmp_unwatermarked, tmp_processed);
     // Extra: calculate histogram of changes
-    histogramMat(tmp_processed, outputHistogram);
+    histogramMatDiff(tmp_processed, outputHistogram);
 }
 
