@@ -23,6 +23,8 @@
 //
 
 #include "Metric.hpp"
+#include <iostream>
+#include <algorithm>
 
 Metric::Metric(int h, int w)
 {
@@ -77,6 +79,21 @@ void Metric::histogramMatDiffFloat(cv::Mat input, int* outputHistogram, int amou
     int histSize = nVals * 2;
     histogram(input, outputHistogram, lowerRange, upperRange, histSize); // 8 bit: 2^8 = 256    
 }
+
+// Computes the average per block
+void Metric::averagePerBlock(cv::Mat& input, cv::Mat &output, int height, int width, int blockSize) {
+    cv::Mat block;
+    for(int i = 0; i*blockSize < width; i++) {
+        int blockWidth = std::min(width - i, blockSize);
+        for(int j = 0; j*blockSize < height; j++) {
+            int blockHeight = std::min(height - j, blockSize);
+            block = input(cv::Rect(i, j, blockWidth, blockHeight));
+            float average = cv::mean(block).val[0];
+            output.at<float>(j, i) = average;
+        }
+    }
+}
+
 
 void Metric::applyGaussianBlur(const cv::Mat& src, cv::Mat& dst, int ksize, double sigma)
 {

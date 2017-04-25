@@ -49,12 +49,13 @@ public:
 	SSIM(int height, int width);
 	// Compute the SSIM index of the processed image
 	float compute(const cv::Mat& original, const cv::Mat& processed);
-    void compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& subtract, int* outputHistogram, int amountOfBins);
+    void compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& subtract, int** outputHistogram, int amountOfBins, int blockSizes[], int amountOfBlockSizes);
 protected:
 	// Compute the SSIM index and mean of the contrast comparison function
 	cv::Scalar computeSSIM(const cv::Mat& img1, const cv::Mat& img2);
     // Compute SSIM of whole map
     void computeSSIMMap(const cv::Mat& img1, const cv::Mat& img2, const cv::Mat& ssim_map);
+    void computeSSIMMapBlocks(const cv::Mat& img1, const cv::Mat& img2, const cv::Mat& ssim_map, int blockSize);
 private:
 	static const float C1;
 	static const float C2;

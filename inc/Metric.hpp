@@ -38,6 +38,7 @@ public:
     void histogramMat(cv::Mat input, int* outputHistogram);
     void histogramMatDiff(cv::Mat input, int* outputHistogram);
     void histogramMatDiffFloat(cv::Mat input, int* outputHistogram, int amountOfBins);
+    void averagePerBlock(cv::Mat& input, cv::Mat& output, int height, int width, int blockSize);
 protected:
 	int height;
 	int width;

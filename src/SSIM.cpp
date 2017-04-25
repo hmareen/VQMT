@@ -34,6 +34,7 @@
 //
 
 #include "SSIM.hpp"
+#include <iostream>
 
 const float SSIM::C1 = 6.5025f;
 const float SSIM::C2 = 58.5225f;
@@ -170,13 +171,33 @@ void SSIM::computeSSIMMap(const cv::Mat& img1, const cv::Mat& img2, const cv::Ma
 }
 
 // Computes the PSNR + computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
-void SSIM::compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& unwatermarked, int* outputHistogram, int amountOfBins) {
-    cv::Mat ssim_map_unwatermarked(height-10, width-10, CV_32F);
-    cv::Mat ssim_map_watermarked(height-10, width-10, CV_32F);
+void SSIM::compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& unwatermarked, int* outputHistogram[], int amountOfBins, int blockSizes[], int amountOfBlockSizes) {
+    int h = height - 10;
+    int w = width - 10;
+    cv::Mat ssim_map_unwatermarked(h, w, CV_32F);
+    cv::Mat ssim_map_watermarked(h, w, CV_32F);
+
     computeSSIMMap(processed, original, ssim_map_watermarked);
     computeSSIMMap(unwatermarked, original, ssim_map_unwatermarked);
 
-    cv::subtract(ssim_map_watermarked, ssim_map_unwatermarked, ssim_map_watermarked);
-    // Extra: calculate histogram of changes
-    histogramMatDiffFloat(ssim_map_watermarked, outputHistogram, amountOfBins);
+    for(int i = 0; i < amountOfBlockSizes; i++) {
+        //std::cout << "blocks " << i << "\n";
+        int blockSize = blockSizes[i];
+        //std::cout << "blockSize " << blockSize << "\n";
+        int h_blocks = (h % blockSize) ? h / blockSize + 1 : h / blockSize;
+        int w_blocks = (w % blockSize) ? w / blockSize + 1 : w / blockSize;
+        cv::Mat ssim_map_unwatermarked_blocks(h_blocks, w_blocks, CV_32F);
+        cv::Mat ssim_map_watermarked_blocks(h_blocks, w_blocks, CV_32F);
+        // Separate in blocks
+        averagePerBlock(ssim_map_watermarked, ssim_map_watermarked_blocks, h, w, blockSize);
+        averagePerBlock(ssim_map_unwatermarked, ssim_map_unwatermarked_blocks, h, w, blockSize);
+
+        // Compute differences
+        cv::subtract(ssim_map_watermarked_blocks, ssim_map_unwatermarked_blocks, ssim_map_watermarked_blocks);
+
+        // Calculate histogram of changes
+        histogramMatDiffFloat(ssim_map_watermarked_blocks, outputHistogram[i], amountOfBins);
+    }
+    
 }
+

@@ -68,6 +68,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include <opencv2/core/core.hpp>
 #include "VideoYUV.hpp"
 #include "PSNR.hpp"
@@ -108,6 +109,15 @@ enum Metrics {
     METRIC_HIST_DIFF,
     METRIC_SSIM_HIST_DIFF,
     METRIC_SIZE
+};
+
+enum Hists {
+    BLOCKS1 = 0,
+    BLOCKS2,
+    BLOCKS4,
+    BLOCKS8,
+    BLOCKS16,
+    HISTS_SIZE
 };
 
 int main (int argc, const char *argv[])
@@ -154,6 +164,7 @@ int main (int argc, const char *argv[])
 
 	// Output files for results
 	FILE *result_file[METRIC_SIZE] = {NULL};
+    FILE *result_file_hist_ssim[HISTS_SIZE] = { NULL };
 	char *str = new char[256];
 	for (int i=7; i<argc; i++) {
 		if (strcmp(argv[i], "PSNR") == 0) {
@@ -178,7 +189,12 @@ int main (int argc, const char *argv[])
 		}
         else if(strcmp(argv[i], "SSIM_HIST_DIFF") == 0) {
             sprintf(str, "%s_ssim_hist_diff.csv", argv[PARAM_RESULTS]);
-            result_file[METRIC_SSIM_HIST_DIFF] = fopen(str, "w");
+            //result_file[METRIC_SSIM_HIST_DIFF] = fopen(str, "w");
+            for(int i = 0; i < HISTS_SIZE; i++) {
+                int blockSize = pow(2, i);
+                sprintf(str, "%s_ssim_hist_diff_b%d.csv", argv[PARAM_RESULTS], blockSize);
+                result_file_hist_ssim[i] = fopen(str, "w");
+            }
         }
 		else if (strcmp(argv[i], "VIFP") == 0) {
 			sprintf(str, "%s_vifp.csv", argv[PARAM_RESULTS]);
@@ -253,6 +269,11 @@ int main (int argc, const char *argv[])
     }
 
 
+    //blockSize = 4;
+    int blockSizes[HISTS_SIZE] = { 0 };
+    for(int i = 0; i < HISTS_SIZE; i++) {
+        blockSizes[i] = pow(2, i);
+    }
     const int amountOfSSIMBins = 20;
     if(result_file[METRIC_SSIM_HIST_DIFF] != NULL) {
         fprintf(result_file[METRIC_SSIM_HIST_DIFF], "frame");
@@ -260,6 +281,15 @@ int main (int argc, const char *argv[])
             fprintf(result_file[METRIC_SSIM_HIST_DIFF], ",%f", (-1.0 + i * 1.0/amountOfSSIMBins));
         }
         fprintf(result_file[METRIC_SSIM_HIST_DIFF], "\n");
+    }
+    for(int i = 0; i < HISTS_SIZE; i++) {
+        if(result_file_hist_ssim[i] != NULL) {
+            fprintf(result_file_hist_ssim[i], "frame");
+            for(float j = 0; j < amountOfSSIMBins * 2; j++) {
+                fprintf(result_file_hist_ssim[i], ",%f", (-1.0 + j * 1.0 / amountOfSSIMBins));
+            }
+            fprintf(result_file_hist_ssim[i], "\n");
+        }
     }
 
 	PSNR *psnr     = new PSNR(height, width);
@@ -278,8 +308,20 @@ int main (int argc, const char *argv[])
     int maxHistBuffer[256] = { 0 };
     int histSubBuffer[511] = { 0 };
     int maxHistSubBuffer[511] = { 0 };
-    int histSSIMSubBuffer[amountOfSSIMBins * 2] = { 0 };
-    int maxHistSSIMSubBuffer[amountOfSSIMBins * 2] = { 0 };
+    int* histSSIMSubBuffers[HISTS_SIZE];
+    int* maxHistSSIMSubBuffers[HISTS_SIZE];
+
+    // Initialize
+    for(int i = 0; i < HISTS_SIZE; i++) {
+        int n = amountOfSSIMBins * 2;
+
+        histSSIMSubBuffers[i] = new int[n];
+        memset(histSSIMSubBuffers[i], 0, n*sizeof(int));
+
+        maxHistSSIMSubBuffers[i] = new int[n];
+        memset(maxHistSSIMSubBuffers[i], 0, n*sizeof(int));
+    }
+
 	for (int frame=0; frame<nbframes; frame++) {
 		// Grab frame
 		if (!original->readOneFrame()) exit(EXIT_FAILURE);
@@ -318,9 +360,9 @@ int main (int argc, const char *argv[])
 			result[METRIC_MSSSIM] = msssim->getMSSSIM();
 		}
 
-        if(result_file[METRIC_SSIM_HIST_DIFF] != NULL) {
+        if(result_file_hist_ssim[0] != NULL) {
             // New: compute histogram of SSIM differences of (orig - processed) - (orig - unwatermarked)! 
-            ssim->compute_with_hist_sub(original_frame, processed_frame, subtract_frame, histSSIMSubBuffer, amountOfSSIMBins);
+            ssim->compute_with_hist_sub(original_frame, processed_frame, subtract_frame, histSSIMSubBuffers, amountOfSSIMBins, blockSizes, HISTS_SIZE);
         }
 
 		// Compute VIFp
@@ -399,17 +441,25 @@ int main (int argc, const char *argv[])
             fprintf(result_file[METRIC_HIST_DIFF], "\n");
         }
 
-        // Extra: print quality histogram sub to file
-        if(result_file[METRIC_SSIM_HIST_DIFF] != NULL) {
-            fprintf(result_file[METRIC_SSIM_HIST_DIFF], "%d", frame);
-            for(int i = 0; i < amountOfSSIMBins*2; i++) {
-                fprintf(result_file[METRIC_SSIM_HIST_DIFF], ",%d", histSSIMSubBuffer[i]);
-                // Keep max
-                if(histSSIMSubBuffer[i] > maxHistSSIMSubBuffer[i]) maxHistSSIMSubBuffer[i] = histSSIMSubBuffer[i];
+        // Extra: print quality histograms sub to files
+        for(int i = 0; i < HISTS_SIZE; i++) {
+            if(result_file_hist_ssim[i] != NULL) {
+                fprintf(result_file_hist_ssim[i], "%d", frame);
+                for(int j = 0; j < amountOfSSIMBins * 2; j++) {
+                    if(histSSIMSubBuffers[i][j] == 0) {
+                        fprintf(result_file_hist_ssim[i], ",");
+                    } else {
+                        fprintf(result_file_hist_ssim[i], ",%d", histSSIMSubBuffers[i][j]);
+                    }
+                    // Keep max
+                    if(histSSIMSubBuffers[i][j] > maxHistSSIMSubBuffers[i][j]) maxHistSSIMSubBuffers[i][j] = histSSIMSubBuffers[i][j];
+                }
+                fprintf(result_file_hist_ssim[i], "\n");
             }
-            fprintf(result_file[METRIC_SSIM_HIST_DIFF], "\n");
         }
 	}
+
+    std::cout << "Done with loop!" << "\n";
 
 	// Print average quality index to file
     for(int m = 0; m < METRIC_SIZE_1_VALUE; m++) {
@@ -439,12 +489,24 @@ int main (int argc, const char *argv[])
     }
 
     // Extra: print max of quality histograms sub
-    if(result_file[METRIC_SSIM_HIST_DIFF] != NULL) {
-        fprintf(result_file[METRIC_SSIM_HIST_DIFF], "max");
-        for(int i = 0; i < amountOfSSIMBins*2; i++) {
-            fprintf(result_file[METRIC_SSIM_HIST_DIFF], ",%d", maxHistSSIMSubBuffer[i]);
+    for(int i = 0; i < HISTS_SIZE; i++) {
+        if(result_file_hist_ssim[i] != NULL) {
+            fprintf(result_file_hist_ssim[i], "max");
+            for(int j = 0; j < amountOfSSIMBins * 2; j++) {
+                if(maxHistSSIMSubBuffers[i][j] == 0) {
+                    fprintf(result_file_hist_ssim[i], ",");
+                } else {
+                    fprintf(result_file_hist_ssim[i], ",%d", maxHistSSIMSubBuffers[i][j]);
+                }
+            }
+            fprintf(result_file_hist_ssim[i], "\n");
         }
-        fprintf(result_file[METRIC_SSIM_HIST_DIFF], "\n");
+    }
+    
+    // Delete created pointers
+    for(int i = 0; i < HISTS_SIZE; i++) {
+        delete[] histSSIMSubBuffers[i];
+        delete[] maxHistSSIMSubBuffers[i];
     }
 
 	delete psnr;
