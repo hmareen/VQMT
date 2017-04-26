@@ -418,13 +418,14 @@ int main (int argc, const char *argv[])
         for(int m = 0; m<METRIC_SIZE_1_VALUE; m++) {
 			if (result_file[m] != NULL) {
 				result_avg[m] += result[m];
-				fprintf(result_file[m], "%d,%.6f\n", frame, static_cast<double>(result[m]));
+				//fprintf(result_file[m], "%d,%.6f\n", frame, static_cast<double>(result[m]));
+                fprintf(result_file[m], "%.6f\n", static_cast<double>(result[m]));
 			}
 		}
 
         // Extra: print quality histogram to file
         if(result_file[METRIC_HIST] != NULL) {
-            fprintf(result_file[METRIC_HIST], "%d", frame);
+            //fprintf(result_file[METRIC_HIST], "%d", frame);
             for(int i = 0; i < 256; i++) {
                 fprintf(result_file[METRIC_HIST], ",%d", histBuffer[i]);
                 // Keep max
@@ -437,7 +438,7 @@ int main (int argc, const char *argv[])
         for(int i = 0; i < HISTS_SIZE; i++) {
             //PSNR
             if(result_file_hist_psnr[i] != NULL) {
-                fprintf(result_file_hist_psnr[i], "%d", frame);
+                //fprintf(result_file_hist_psnr[i], "%d", frame);
                 for(int j = 0; j < amountOfPSNRBins * 2; j++) {
                     if(histSubBuffers[i][j] == 0) {
                         fprintf(result_file_hist_psnr[i], ",");
@@ -452,7 +453,7 @@ int main (int argc, const char *argv[])
 
             // SSIM
             if(result_file_hist_ssim[i] != NULL) {
-                fprintf(result_file_hist_ssim[i], "%d", frame);
+                //fprintf(result_file_hist_ssim[i], "%d", frame);
                 for(int j = 0; j < amountOfSSIMBins * 2; j++) {
                     if(histSSIMSubBuffers[i][j] == 0) {
                         fprintf(result_file_hist_ssim[i], ",");
