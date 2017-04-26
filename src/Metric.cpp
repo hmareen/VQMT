@@ -61,11 +61,12 @@ void Metric::histogramMat(cv::Mat input, int* outputHistogram) {
 
 // Computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of -255-differences, etc.)
 // + in both negative and positive direction
-void Metric::histogramMatDiff(cv::Mat input, int* outputHistogram) {
-    int nVals = 256;
-    float lowerRange = -(float)nVals + 1.0;
-    float upperRange = (float)nVals;
-    int histSize = (nVals * 2) - 1;
+void Metric::histogramMatDiff(cv::Mat input, int* outputHistogram, int amountOfBins) {
+    int nVals = amountOfBins;
+    int fullNVals = 256;
+    float lowerRange = -(float)fullNVals;
+    float upperRange = (float)fullNVals;
+    int histSize = nVals * 2;
     histogram(input, outputHistogram, lowerRange, upperRange, histSize); // 8 bit: 2^8 = 256    
 }
 
@@ -93,7 +94,6 @@ void Metric::averagePerBlock(cv::Mat& input, cv::Mat &output, int height, int wi
         }
     }
 }
-
 
 void Metric::applyGaussianBlur(const cv::Mat& src, cv::Mat& dst, int ksize, double sigma)
 {

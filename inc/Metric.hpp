@@ -36,7 +36,7 @@ public:
 	virtual float compute(const cv::Mat& original, const cv::Mat& processed) = 0;
     void histogram(cv::Mat input, int* outputHistogram, float lowerRange, float upperRange, int histSize);
     void histogramMat(cv::Mat input, int* outputHistogram);
-    void histogramMatDiff(cv::Mat input, int* outputHistogram);
+    void histogramMatDiff(cv::Mat input, int* outputHistogram, int amountOfBins);
     void histogramMatDiffFloat(cv::Mat input, int* outputHistogram, int amountOfBins);
     void averagePerBlock(cv::Mat& input, cv::Mat& output, int height, int width, int blockSize);
 protected:

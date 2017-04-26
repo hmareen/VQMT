@@ -46,14 +46,26 @@ void PSNR::compute_with_hist(const cv::Mat& original, const cv::Mat& processed, 
 }
 
 // Computes the PSNR + computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
-void PSNR::compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& unwatermarked, int* outputHistogram) {
+void PSNR::compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& unwatermarked, int** outputHistograms, int amountOfBins, int blockSizes[], int amountOfBlockSizes) {
     cv::Mat tmp_processed(height, width, CV_32F);
     cv::Mat tmp_unwatermarked(height, width, CV_32F);
     cv::subtract(processed, original, tmp_processed);
     cv::subtract(unwatermarked, original, tmp_unwatermarked);
 
+    // Compute differences
     cv::subtract(tmp_processed, tmp_unwatermarked, tmp_processed);
-    // Extra: calculate histogram of changes
-    histogramMatDiff(tmp_processed, outputHistogram);
+
+    for(int i = 0; i < amountOfBlockSizes; i++) {
+        int blockSize = blockSizes[i];
+        int h_blocks = (height % blockSize) ? height / blockSize + 1 : height / blockSize;
+        int w_blocks = (width % blockSize) ? width / blockSize + 1 : width / blockSize;
+        cv::Mat tmp_processed_blocks(h_blocks, w_blocks, CV_32F);
+
+        // Separate in blocks
+        averagePerBlock(tmp_processed, tmp_processed_blocks, height, width, blockSize);
+
+        // Calculate histogram of changes
+        histogramMatDiff(tmp_processed_blocks, outputHistograms[i], amountOfBins);
+    }
 }
 
