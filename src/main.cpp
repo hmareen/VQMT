@@ -81,7 +81,7 @@
 enum Params {
 	PARAM_ORIGINAL = 1,	// Original video stream (YUV)
 	PARAM_PROCESSED,	// Processed video stream (YUV)
-    PARAM_SUBTRACT,     // Video stream to subtract from both (YUV) (or " " if nothing to subtract)
+    PARAM_EXTRA,     // Extra video (YUV) (or " " if no extra)
 	PARAM_HEIGHT,		// Height
 	PARAM_WIDTH,		// Width
 	PARAM_NBFRAMES,		// Number of frames
@@ -157,9 +157,9 @@ int main (int argc, const char *argv[])
 	VideoYUV *original  = new VideoYUV(argv[PARAM_ORIGINAL], height, width, nbframes, chroma);
 	VideoYUV *processed = new VideoYUV(argv[PARAM_PROCESSED], height, width, nbframes, chroma);
 
-    VideoYUV *subtract;
-    if(strlen(argv[PARAM_SUBTRACT]) > 1) {
-        subtract = new VideoYUV(argv[PARAM_SUBTRACT], height, width, nbframes, chroma);
+    VideoYUV *extra;
+    if(strlen(argv[PARAM_EXTRA]) > 1) {
+        extra = new VideoYUV(argv[PARAM_EXTRA], height, width, nbframes, chroma);
     }
 
 	// Output files for results
@@ -272,12 +272,14 @@ int main (int argc, const char *argv[])
         blockSizes[i] = pow(2, i);
     }
     const int amountOfPSNRBins = 16;
+    float minMaxRelPSNR = 256;
     const int amountOfSSIMBins = 20;
+    float minMaxRelSSIM = 1.0;
     for(int i = 0; i < HISTS_SIZE; i++) {
         if(result_file_hist_psnr[i] != NULL) {
             fprintf(result_file_hist_psnr[i], "frame");
             for(int j = 0; j < amountOfPSNRBins * 2; j++) {
-                fprintf(result_file_hist_psnr[i], ",%d", (-256 + j * (256 / amountOfPSNRBins)));
+                fprintf(result_file_hist_psnr[i], ",%f", (-minMaxRelPSNR + j * (minMaxRelPSNR / amountOfPSNRBins)));
             }
             fprintf(result_file_hist_psnr[i], "\n");
         }
@@ -285,7 +287,7 @@ int main (int argc, const char *argv[])
         if(result_file_hist_ssim[i] != NULL) {
             fprintf(result_file_hist_ssim[i], "frame");
             for(float j = 0; j < amountOfSSIMBins * 2; j++) {
-                fprintf(result_file_hist_ssim[i], ",%f", (-1.0 + j * 1.0 / amountOfSSIMBins));
+                fprintf(result_file_hist_ssim[i], ",%f", (-minMaxRelSSIM + j * minMaxRelSSIM / amountOfSSIMBins));
             }
             fprintf(result_file_hist_ssim[i], "\n");
         }
@@ -299,7 +301,7 @@ int main (int argc, const char *argv[])
     CORRELATION *correlation = new CORRELATION(height, width);
 
     cv::Mat original_frame(height, width, CV_32F), processed_frame(height, width, CV_32F);
-    cv::Mat subtract_frame(height, width, CV_32F);
+    cv::Mat extra_frame(height, width, CV_32F);
 	float result[METRIC_SIZE_1_VALUE] = {0};
     float result_avg[METRIC_SIZE_1_VALUE] = { 0 };
 
@@ -331,9 +333,9 @@ int main (int argc, const char *argv[])
 		original->getLuma(original_frame, CV_32F);
 		if (!processed->readOneFrame()) exit(EXIT_FAILURE);
 		processed->getLuma(processed_frame, CV_32F);
-        if(strlen(argv[PARAM_SUBTRACT]) > 1) {
-            if(!subtract->readOneFrame()) exit(EXIT_FAILURE);
-            subtract->getLuma(subtract_frame, CV_32F);
+        if(strlen(argv[PARAM_EXTRA]) > 1) {
+            if(!extra->readOneFrame()) exit(EXIT_FAILURE);
+            extra->getLuma(extra_frame, CV_32F);
         }
 
 		// Compute PSNR
@@ -347,8 +349,9 @@ int main (int argc, const char *argv[])
         }
 
         if(result_file_hist_psnr[0] != NULL) {
-            // New: compute histogram of differences of (difference orig - processed) - (difference orig - unwatermarked)! 
-            psnr->compute_with_hist_sub(original_frame, processed_frame, subtract_frame, histSubBuffers, amountOfPSNRBins, blockSizes, HISTS_SIZE);
+            // New: compute histogram of differences of (MSE orig - processed) - (MSE orig - unwatermarked)! (per block)
+            // (extra = unwatermarked)
+            psnr->compute_with_hist_sub(original_frame, processed_frame, extra_frame, histSubBuffers, amountOfPSNRBins, blockSizes, HISTS_SIZE);
         }
 
 		// Compute SSIM and MS-SSIM
@@ -364,8 +367,9 @@ int main (int argc, const char *argv[])
 		}
 
         if(result_file_hist_ssim[0] != NULL) {
-            // New: compute histogram of SSIM differences of (orig - processed) - (orig - unwatermarked)! 
-            ssim->compute_with_hist_sub(original_frame, processed_frame, subtract_frame, histSSIMSubBuffers, amountOfSSIMBins, blockSizes, HISTS_SIZE);
+            // New: compute histogram of SSIM differences of (SSIM orig - processed) - (SSIM orig - unwatermarked)! (per block)
+            // (extra_frame = unwatermarked)
+            ssim->compute_with_hist_sub(original_frame, processed_frame, extra_frame, histSSIMSubBuffers, amountOfSSIMBins, blockSizes, HISTS_SIZE);
         }
 
 		// Compute VIFp
@@ -386,17 +390,17 @@ int main (int argc, const char *argv[])
 
         if(result_file[METRIC_CORRELATION_LIN] != NULL) {
             // New: compute linear correlation
-            result[METRIC_CORRELATION_LIN] = correlation->compute_correlation_linear_subtract(original_frame, processed_frame, subtract_frame);
+            result[METRIC_CORRELATION_LIN] = correlation->compute_correlation_linear_subtract(original_frame, processed_frame, extra_frame);
         }
 
         if(result_file[METRIC_CORRELATION_NORM] != NULL) {
             // New: compute normalized correlation
-            result[METRIC_CORRELATION_NORM] = correlation->compute_correlation_normalized_subtract(original_frame, processed_frame, subtract_frame);
+            result[METRIC_CORRELATION_NORM] = correlation->compute_correlation_normalized_subtract(original_frame, processed_frame, extra_frame);
         }
 
         if(result_file[METRIC_CORRELATION_COEF] != NULL) {
             // New: compute correlation coefficient
-            result[METRIC_CORRELATION_COEF] = correlation->compute_correlation_coefficient_subtract(original_frame, processed_frame, subtract_frame);
+            result[METRIC_CORRELATION_COEF] = correlation->compute_correlation_coefficient_subtract(original_frame, processed_frame, extra_frame);
         }
 
         if(result_file[METRIC_CORRELATION_LIN_NO_SUB] != NULL) {

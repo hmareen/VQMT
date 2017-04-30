@@ -59,26 +59,14 @@ void Metric::histogramMat(cv::Mat input, int* outputHistogram) {
     histogram(input, outputHistogram, lowerRange, upperRange, histSize); // 8 bit: 2^8 = 256
 }
 
-// Computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of -255-differences, etc.)
+// Computes a histogram of the differences, and stores it in outputHistogram
 // + in both negative and positive direction
-void Metric::histogramMatDiff(cv::Mat input, int* outputHistogram, int amountOfBins) {
+void Metric::histogramMatDiff(cv::Mat input, int* outputHistogram, int amountOfBins, float minMax) {
     int nVals = amountOfBins;
-    int fullNVals = 256;
-    float lowerRange = -(float)fullNVals;
-    float upperRange = (float)fullNVals;
+    float lowerRange = -minMax;
+    float upperRange = minMax;
     int histSize = nVals * 2;
-    histogram(input, outputHistogram, lowerRange, upperRange, histSize); // 8 bit: 2^8 = 256    
-}
-
-// Computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of -1-differences, etc.)
-// + in both negative and positive direction
-// + in range [-1.0, 1.0]
-void Metric::histogramMatDiffFloat(cv::Mat input, int* outputHistogram, int amountOfBins) {
-    int nVals = amountOfBins;
-    float lowerRange = -1.0;
-    float upperRange = 1.0;
-    int histSize = nVals * 2;
-    histogram(input, outputHistogram, lowerRange, upperRange, histSize); // 8 bit: 2^8 = 256    
+    histogram(input, outputHistogram, lowerRange, upperRange, histSize);  
 }
 
 // Computes the average per block
