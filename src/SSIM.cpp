@@ -194,7 +194,7 @@ void SSIM::compute_with_hist_sub(const cv::Mat& original, const cv::Mat& process
         averagePerBlock(ssim_map_unwatermarked, ssim_map_unwatermarked_blocks, h, w, blockSize);
 
         // Compute differences
-        cv::subtract(ssim_map_watermarked_blocks, ssim_map_unwatermarked_blocks, ssim_map_watermarked_blocks);
+        cv::subtract(ssim_map_unwatermarked_blocks, ssim_map_watermarked_blocks, ssim_map_watermarked_blocks);
 
         // RELATIVE
         //cv::divide(ssim_map_watermarked_blocks, ssim_map_unwatermarked_blocks, ssim_map_watermarked_blocks);

@@ -52,8 +52,11 @@ void PSNR::compute_with_hist_sub(const cv::Mat& original, const cv::Mat& process
     cv::Mat tmp_processed(height, width, CV_32F);
     cv::Mat tmp_unwatermarked(height, width, CV_32F);
     // Compute diff
-    cv::subtract(processed, original, tmp_processed);
-    cv::subtract(unwatermarked, original, tmp_unwatermarked);
+    //cv::subtract(processed, original, tmp_processed);
+    //cv::subtract(unwatermarked, original, tmp_unwatermarked);
+    // Compute abs diff
+    cv::absdiff(processed, original, tmp_processed);
+    cv::absdiff(unwatermarked, original, tmp_unwatermarked);
 
     // Compute MSE
     //cv::multiply(tmp_processed, tmp_processed, tmp_processed);
@@ -71,7 +74,7 @@ void PSNR::compute_with_hist_sub(const cv::Mat& original, const cv::Mat& process
         averagePerBlock(tmp_unwatermarked, tmp_unwatermarked_blocks, height, width, blockSize);
 
         // Compute differences
-        cv::subtract(tmp_processed_blocks, tmp_unwatermarked_blocks, tmp_processed_blocks);
+        cv::subtract(tmp_unwatermarked_blocks, tmp_processed_blocks, tmp_processed_blocks);
 
         // RELATIVE
         //cv::divide(tmp_processed_blocks, tmp_unwatermarked_blocks, tmp_processed_blocks);
