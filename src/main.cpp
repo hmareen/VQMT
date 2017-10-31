@@ -93,6 +93,7 @@ enum Params {
 
 enum Metrics {
     METRIC_PSNR = 0,
+	METRIC_ABS_ERR,
     METRIC_SSIM,
     METRIC_MSSSIM,
     METRIC_VIFP,
@@ -171,6 +172,10 @@ int main (int argc, const char *argv[])
 		if (strcmp(argv[i], "PSNR") == 0) {
 			sprintf(str, "%s_psnr.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_PSNR] = fopen(str, "w");
+		}
+		if (strcmp(argv[i], "ABS_ERR") == 0) {
+			sprintf(str, "%s_abs_err.csv", argv[PARAM_RESULTS]);
+			result_file[METRIC_ABS_ERR] = fopen(str, "w");
 		}
         else if(strcmp(argv[i], "HIST") == 0) {
             sprintf(str, "%s_hist.csv", argv[PARAM_RESULTS]);
@@ -341,6 +346,10 @@ int main (int argc, const char *argv[])
 		// Compute PSNR
 		if (result_file[METRIC_PSNR] != NULL) {
             result[METRIC_PSNR] = psnr->compute(original_frame, processed_frame);
+		}
+
+		if (result_file[METRIC_ABS_ERR] != NULL) {
+			result[METRIC_ABS_ERR] = psnr->compute_abs_error(original_frame, processed_frame);
 		}
 
         if(result_file[METRIC_HIST] != NULL) {

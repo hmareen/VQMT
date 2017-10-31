@@ -36,6 +36,12 @@ float PSNR::compute(const cv::Mat& original, const cv::Mat& processed) {
     return float(10 * log10(255 * 255 / cv::mean(tmp).val[0]));
 }
 
+float PSNR::compute_abs_error(const cv::Mat& original, const cv::Mat& processed) {
+	cv::Mat tmp(height, width, CV_32F);
+	cv::absdiff(original, processed, tmp);
+	return float(cv::sum(tmp).val[0]);
+}
+
 // Computes the absolute differences + computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
 void PSNR::compute_with_hist(const cv::Mat& original, const cv::Mat& processed, int* outputHistogram) {
 	cv::Mat tmp(height,width,CV_32F);
