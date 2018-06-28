@@ -42,6 +42,23 @@ float PSNR::compute_abs_error(const cv::Mat& original, const cv::Mat& processed)
 	return float(cv::sum(tmp).val[0]);
 }
 
+float PSNR::compute_abs_error(const cv::Mat& original, const cv::Mat& processed, int white_x, int white_y, int white_width, int white_height) {
+  cv::Mat original_tmp = original.clone();
+  cv::Mat processed_tmp = processed.clone();
+
+  // Set whitebox all to zero
+  for (int i = white_x; i < white_x + white_width; i++) {
+    for (int j = white_y; j < white_y + white_height; j++) {
+      original_tmp.at<float>(j, i, 0) = 0;
+      processed_tmp.at<float>(j, i, 0) = 0;
+    }
+  }
+
+  cv::absdiff(original_tmp, processed_tmp, original_tmp);
+
+  return float(cv::sum(original_tmp).val[0]);
+}
+
 // Computes the absolute differences + computes a histogram of the differences, and stores it in outputHistogram (index 0 is amount of 0-differences, etc.)
 void PSNR::compute_with_hist(const cv::Mat& original, const cv::Mat& processed, int* outputHistogram) {
 	cv::Mat tmp(height,width,CV_32F);

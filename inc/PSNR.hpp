@@ -40,6 +40,7 @@ public:
     float compute(const cv::Mat& original, const cv::Mat& processed);
 	// Compute absolute error
 	float compute_abs_error(const cv::Mat& original, const cv::Mat& processed);
+  float compute_abs_error(const cv::Mat& original, const cv::Mat& processed, int white_x, int white_y, int white_width, int white_height);
     // Compute the PSNR index of the processed image + distribution
 	void compute_with_hist(const cv::Mat& original, const cv::Mat& processed, int* outputHistogram);
     void compute_with_hist_sub(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& subtract, int** outputHistograms, int amountOfBins, int blockSizes[], int amountOfBlockSizes);

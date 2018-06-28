@@ -37,13 +37,38 @@ float CORRELATION::compute_correlation_coefficient(const cv::Mat& original, cons
     cv::subtract(original, cv::mean(original).val[0], original_tmp);
     cv::subtract(processed, cv::mean(processed).val[0], processed_tmp);
 
-    // Normalize (=divide by sum of squares (= euclidean length)
+    // Normalize (=divide by sum of squares (= euclidean length))
     cv::normalize(original_tmp, original_tmp);
     cv::normalize(processed_tmp, processed_tmp);
 
     // Calculate correlation
     cv::multiply(original_tmp, processed_tmp, original_tmp);
     return cv::sum(original_tmp).val[0];
+}
+
+float CORRELATION::compute_correlation_coefficient(const cv::Mat& original, const cv::Mat& processed, int white_x, int white_y, int white_width, int white_height) {
+  cv::Mat original_tmp = original.clone();
+  cv::Mat processed_tmp = processed.clone();
+
+  // Set whitebox all to zero
+  for (int i = white_x; i < white_x + white_width; i++) {
+    for (int j = white_y; j < white_y + white_height; j++) {
+      original_tmp.at<float>(j, i, 0) = 0;
+      processed_tmp.at<float>(j, i, 0) = 0;
+    }
+  }
+
+  // Subtract mean
+  cv::subtract(original_tmp, cv::mean(original_tmp).val[0], original_tmp);
+  cv::subtract(processed_tmp, cv::mean(processed_tmp).val[0], processed_tmp);
+
+  // Normalize (=divide by sum of squares (= euclidean length))
+  cv::normalize(original_tmp, original_tmp);
+  cv::normalize(processed_tmp, processed_tmp);
+
+  // Calculate correlation
+  cv::multiply(original_tmp, processed_tmp, original_tmp);
+  return cv::sum(original_tmp).val[0];
 }
 
 /* Subtracted functions (copy paste for efficiency: no need to keep extra Mat in memory) */

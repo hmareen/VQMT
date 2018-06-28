@@ -26,7 +26,7 @@
 /**************************************************************************
 
  Usage:
-  VQMT.exe OriginalVideo ProcessedVideo Height Width NumberOfFrames ChromaFormat Output Metrics
+  VQMT.exe OriginalVideo ProcessedVideo ExtraVideo Height Width NumberOfFrames ChromaFormat Output Metrics
 
   OriginalVideo: the original video as raw YUV video file, progressively scanned, and 8 bits per sample
   ProcessedVideo: the processed video as raw YUV video file, progressively scanned, and 8 bits per sample
@@ -46,7 +46,9 @@
    - PSNRHVSM: Peak Signal-to-Noise Ratio taking into account Contrast Sensitivity Function (CSF) and between-coefficient contrast masking of DCT basis functions (PSNR-HVS-M)
 
  Example:
-  VQMT.exe original.yuv processed.yuv 1088 1920 250 1 results PSNR SSIM MSSSIM VIFP
+  VQMT.exe original.yuv processed.yuv " " 1088 1920 250 1 results PSNR SSIM MSSSIM VIFP
+  + Whitebox:
+  VQMT.exe original.yuv processed.yuv " " 1088 1920 X Y W H 250 1 results PSNR SSIM MSSSIM VIFP
   will create the following output files in CSV (comma-separated values) format:
   - results_pnsr.csv
   - results_ssim.csv
@@ -81,9 +83,13 @@
 enum Params {
 	PARAM_ORIGINAL = 1,	// Original video stream (YUV)
 	PARAM_PROCESSED,	// Processed video stream (YUV)
-    PARAM_EXTRA,     // Extra video (YUV) (or " " if no extra)
+  PARAM_EXTRA,     // Extra video (YUV) (or " " if no extra)
 	PARAM_HEIGHT,		// Height
 	PARAM_WIDTH,		// Width
+  PARAM_WHITE_X,
+  PARAM_WHITE_Y,
+  PARAM_WHITE_WIDTH,
+  PARAM_WHITE_HEIGHT,
 	PARAM_NBFRAMES,		// Number of frames
 	PARAM_CHROMA,		// Chroma format
 	PARAM_RESULTS,		// Output file for results
@@ -94,6 +100,7 @@ enum Params {
 enum Metrics {
     METRIC_PSNR = 0,
 	METRIC_ABS_ERR,
+  METRIC_ABS_ERR_WHITE,
     METRIC_SSIM,
     METRIC_MSSSIM,
     METRIC_VIFP,
@@ -105,6 +112,7 @@ enum Metrics {
     METRIC_CORRELATION_LIN_NO_SUB,
     METRIC_CORRELATION_NORM_NO_SUB,
     METRIC_CORRELATION_COEF_NO_SUB,
+    METRIC_CORRELATION_COEF_NO_SUB_WHITE,
     METRIC_SIZE_1_VALUE,
     METRIC_HIST,
     METRIC_HIST_DIFF,
@@ -143,6 +151,26 @@ int main (int argc, const char *argv[])
 		fprintf(stderr, "Incorrect value for video width: %s\n", argv[PARAM_WIDTH]);
 		return EXIT_FAILURE;
 	}
+  int white_x = static_cast<int>(strtol(argv[PARAM_WHITE_X], &endptr, 10));
+  if (*endptr) {
+    fprintf(stderr, "Incorrect value for video white X: %s\n", argv[PARAM_WHITE_X]);
+    return EXIT_FAILURE;
+  }
+  int white_y = static_cast<int>(strtol(argv[PARAM_WHITE_Y], &endptr, 10));
+  if (*endptr) {
+    fprintf(stderr, "Incorrect value for video white Y: %s\n", argv[PARAM_WHITE_Y]);
+    return EXIT_FAILURE;
+  }
+  int white_height = static_cast<int>(strtol(argv[PARAM_WHITE_HEIGHT], &endptr, 10));
+  if (*endptr) {
+    fprintf(stderr, "Incorrect value for video white height: %s\n", argv[PARAM_WHITE_HEIGHT]);
+    return EXIT_FAILURE;
+  }
+  int white_width = static_cast<int>(strtol(argv[PARAM_WHITE_WIDTH], &endptr, 10));
+  if (*endptr) {
+    fprintf(stderr, "Incorrect value for video white width: %s\n", argv[PARAM_WHITE_WIDTH]);
+    return EXIT_FAILURE;
+  }
 	int nbframes = static_cast<int>(strtol(argv[PARAM_NBFRAMES], &endptr, 10));
 	if (*endptr) {
 		fprintf(stderr, "Incorrect value for number of frames: %s\n", argv[PARAM_NBFRAMES]);
@@ -173,10 +201,14 @@ int main (int argc, const char *argv[])
 			sprintf(str, "%s_psnr.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_PSNR] = fopen(str, "w");
 		}
-		if (strcmp(argv[i], "ABS_ERR") == 0) {
+		else if (strcmp(argv[i], "ABS_ERR") == 0) {
 			sprintf(str, "%s_abs_err.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_ABS_ERR] = fopen(str, "w");
 		}
+    else if (strcmp(argv[i], "ABS_ERR_WHITE") == 0) {
+      sprintf(str, "%s_abs_err_white.csv", argv[PARAM_RESULTS]);
+      result_file[METRIC_ABS_ERR_WHITE] = fopen(str, "w");
+    }
         else if(strcmp(argv[i], "HIST") == 0) {
             sprintf(str, "%s_hist.csv", argv[PARAM_RESULTS]);
             result_file[METRIC_HIST] = fopen(str, "w");
@@ -240,6 +272,9 @@ int main (int argc, const char *argv[])
         } else if(strcmp(argv[i], "CORRELATION_COEF_NO_SUB") == 0) {
             sprintf(str, "%s_corr_coef_no_sub.csv", argv[PARAM_RESULTS]);
             result_file[METRIC_CORRELATION_COEF_NO_SUB] = fopen(str, "w");
+        } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_WHITE") == 0) {
+          sprintf(str, "%s_corr_coef_no_sub_white.csv", argv[PARAM_RESULTS]);
+          result_file[METRIC_CORRELATION_COEF_NO_SUB_WHITE] = fopen(str, "w");
         }
 	}
 	delete[] str;
@@ -352,6 +387,10 @@ int main (int argc, const char *argv[])
 			result[METRIC_ABS_ERR] = psnr->compute_abs_error(original_frame, processed_frame);
 		}
 
+    if (result_file[METRIC_ABS_ERR_WHITE] != NULL) {
+      result[METRIC_ABS_ERR_WHITE] = psnr->compute_abs_error(original_frame, processed_frame, white_x, white_y, white_width, white_height);
+    }
+
         if(result_file[METRIC_HIST] != NULL) {
             // New: compute histogram of differences!
             psnr->compute_with_hist(original_frame, processed_frame, histBuffer);
@@ -425,6 +464,10 @@ int main (int argc, const char *argv[])
         if(result_file[METRIC_CORRELATION_COEF_NO_SUB] != NULL) {
             // New: compute correlation coefficient (no sub)
             result[METRIC_CORRELATION_COEF_NO_SUB] = correlation->compute_correlation_coefficient(original_frame, processed_frame);
+        }
+        if (result_file[METRIC_CORRELATION_COEF_NO_SUB_WHITE] != NULL) {
+          // New: compute correlation coefficient (no sub) WHITE
+          result[METRIC_CORRELATION_COEF_NO_SUB_WHITE] = correlation->compute_correlation_coefficient(original_frame, processed_frame, white_x, white_y, white_width, white_height);
         }
 
 		// Print quality index to file
