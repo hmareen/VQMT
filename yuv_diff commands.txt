@@ -1,0 +1,22 @@
+vqmt.exe .\BlowingBubbles_416x240_50_qp22.yuv .\BlowingBubbles_416x240_50_qp22_lr_w260993.yuv " " 416 240 0 0 0 0 500 1 result YUV_DIFF
+    -> generates results_diff.yuv
+
+ffmpeg -f rawvideo -pix_fmt yuv444p -s:v 416x240 -i .\result_diff.yuv -c:v rawvideo -pix_fmt rgb24 .\result_diff.rgb
+    -> generates rgb file
+
+mv ./result_diff.rgb ./result_diff.rgb24
+    -> so it can open with YUVToolkit
+    
+    
+
+PSNR = 20*log10(255) - 10/ln(10)*ln(MSE)
+<=> Diff = V(exp^(ln(10)/10 * (20*log10(255) - PSNR)))
+or
+PSNR = 208log10(255) - 10*log10(MSE)
+<=> Diff = V(10^((20*log10(255) - PSNR)/10))
+
+    
+Blue: PSNR under 22
+    => pixel difference <= 0.80638080334293672965971785383034
+Red: PSNR above 50
+    => pixel difference >= 20.255369985469178302680916212328

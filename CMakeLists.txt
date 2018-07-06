@@ -102,6 +102,7 @@ set(SRCS
     ${SOURCE_DIR}/VideoYUV.cpp
     ${SOURCE_DIR}/VIFP.cpp
     ${SOURCE_DIR}/CORRELATION.cpp
+	${SOURCE_DIR}/YUVDiff.cpp
 )
 add_executable(
     ${EXECUTABLE_NAME}

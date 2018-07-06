@@ -79,6 +79,7 @@
 #include "VIFP.hpp"
 #include "PSNRHVS.hpp"
 #include "CORRELATION.hpp"
+#include "YUVDiff.hpp"
 
 enum Params {
 	PARAM_ORIGINAL = 1,	// Original video stream (YUV)
@@ -117,6 +118,8 @@ enum Metrics {
     METRIC_HIST,
     METRIC_HIST_DIFF,
     METRIC_SSIM_HIST_DIFF,
+    METRIC_YUV_DIFF,
+    METRIC_YUV_DIFF_MSE,
     METRIC_SIZE
 };
 
@@ -195,6 +198,7 @@ int main (int argc, const char *argv[])
 	FILE *result_file[METRIC_SIZE] = {NULL};
     FILE *result_file_hist_psnr[HISTS_SIZE] = { NULL };
     FILE *result_file_hist_ssim[HISTS_SIZE] = { NULL };
+    int result_file_yuv_diff;
 	char *str = new char[256];
 	for (int i=7; i<argc; i++) {
 		if (strcmp(argv[i], "PSNR") == 0) {
@@ -275,6 +279,12 @@ int main (int argc, const char *argv[])
         } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_WHITE") == 0) {
           sprintf(str, "%s_corr_coef_no_sub_white.csv", argv[PARAM_RESULTS]);
           result_file[METRIC_CORRELATION_COEF_NO_SUB_WHITE] = fopen(str, "w");
+        } else if (strcmp(argv[i], "YUV_DIFF") == 0) {
+          sprintf(str, "%s_diff.yuv", argv[PARAM_RESULTS]);
+          result_file[METRIC_YUV_DIFF] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_DIFF_MSE") == 0) {
+          sprintf(str, "%s_diff_mse.yuv", argv[PARAM_RESULTS]);
+          result_file[METRIC_YUV_DIFF_MSE] = fopen(str, "wb");
         }
 	}
 	delete[] str;
@@ -339,9 +349,13 @@ int main (int argc, const char *argv[])
 	VIFP *vifp     = new VIFP(height, width);
 	PSNRHVS *phvs  = new PSNRHVS(height, width);
     CORRELATION *correlation = new CORRELATION(height, width);
+    YUVDiff *yuvDiff = new YUVDiff(height, width);
 
     cv::Mat original_frame(height, width, CV_32F), processed_frame(height, width, CV_32F);
     cv::Mat extra_frame(height, width, CV_32F);
+    cv::Mat y(height, width, CV_8U);
+    cv::Mat u(height, width, CV_8U), v(height, width, CV_8U); // YUV444 output
+    //cv::Mat u(height / 2, width / 2, CV_8U), v(height / 2, width / 2, CV_8U); // YUV420 output doesnt give expected results for some reason
 	float result[METRIC_SIZE_1_VALUE] = {0};
     float result_avg[METRIC_SIZE_1_VALUE] = { 0 };
 
@@ -368,6 +382,7 @@ int main (int argc, const char *argv[])
     }
 
 	for (int frame=0; frame<nbframes; frame++) {
+    //printf("Frame %d\n", frame);
 		// Grab frame
 		if (!original->readOneFrame()) exit(EXIT_FAILURE);
 		original->getLuma(original_frame, CV_32F);
@@ -470,6 +485,20 @@ int main (int argc, const char *argv[])
           result[METRIC_CORRELATION_COEF_NO_SUB_WHITE] = correlation->compute_correlation_coefficient(original_frame, processed_frame, white_x, white_y, white_width, white_height);
         }
 
+        //printf("0\n");
+        if (result_file[METRIC_YUV_DIFF] != NULL) {
+          // New: write difference YUV
+          bool mse_or_psnr = 1; // psnr
+          yuvDiff->calculate_and_map_differences(original_frame, processed_frame, y, u, v, mse_or_psnr);
+          yuvDiff->write_yuv(result_file[METRIC_YUV_DIFF], y, u, v);
+        }
+        if (result_file[METRIC_YUV_DIFF_MSE] != NULL) {
+          // New: write difference YUV MSE
+          bool mse_or_psnr = 0; // mse
+          yuvDiff->calculate_and_map_differences(original_frame, processed_frame, y, u, v, mse_or_psnr);
+          yuvDiff->write_yuv(result_file[METRIC_YUV_DIFF_MSE], y, u, v);
+        }
+
 		// Print quality index to file
         for(int m = 0; m<METRIC_SIZE_1_VALUE; m++) {
 			if (result_file[m] != NULL) {
@@ -542,6 +571,7 @@ int main (int argc, const char *argv[])
             fprintf(result_file[METRIC_HIST], ",%d", maxHistBuffer[i]);
         }
         fprintf(result_file[METRIC_HIST], "\n");
+        fclose(result_file[METRIC_HIST]);
     }
 
     // Extra: print max of quality histograms sub
@@ -557,6 +587,7 @@ int main (int argc, const char *argv[])
                 }
             }
             fprintf(result_file_hist_psnr[i], "\n");
+            fclose(result_file_hist_psnr[i]);
         }
 
         // SSIM
@@ -570,8 +601,21 @@ int main (int argc, const char *argv[])
                 }
             }
             fprintf(result_file_hist_ssim[i], "\n");
+            fclose(result_file_hist_ssim[i]);
         }
     }
+
+    if (result_file[METRIC_YUV_DIFF] != NULL) {
+      fclose(result_file[METRIC_YUV_DIFF]);
+    }
+    if (result_file[METRIC_YUV_DIFF_MSE] != NULL) {
+      fclose(result_file[METRIC_YUV_DIFF_MSE]);
+    }
+
+    //if (result_file_yuv_diff) {
+    //  printf("close\n");
+    //  close(result_file_yuv_diff);
+   //}
     
     // Delete created pointers
     for(int i = 0; i < HISTS_SIZE; i++) {
@@ -588,6 +632,8 @@ int main (int argc, const char *argv[])
 	delete phvs;
 	delete original;
 	delete processed;
+  delete correlation;
+  delete yuvDiff;
 
 	duration = static_cast<double>(cv::getTickCount())-duration;
 	duration /= cv::getTickFrequency();

@@ -34,7 +34,6 @@ Metric::Metric(int h, int w)
 
 Metric::~Metric()
 {
-
 }
 
 void Metric::histogram(cv::Mat input, int* outputHistogram, float lowerRange, float upperRange, int histSize) {
