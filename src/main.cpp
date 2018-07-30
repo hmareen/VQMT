@@ -114,6 +114,10 @@ enum Metrics {
     METRIC_CORRELATION_NORM_NO_SUB,
     METRIC_CORRELATION_COEF_NO_SUB,
     METRIC_CORRELATION_COEF_NO_SUB_WHITE,
+    METRIC_CORRELATION_COEF_NO_SUB_LOWPASS,
+    METRIC_CORRELATION_COEF_LOWPASS,
+    METRIC_CORRELATION_COEF_LOWPASS_BLOCKS,
+    METRIC_CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS,
     METRIC_SIZE_1_VALUE,
     METRIC_HIST,
     METRIC_HIST_DIFF,
@@ -279,6 +283,18 @@ int main (int argc, const char *argv[])
         } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_WHITE") == 0) {
           sprintf(str, "%s_corr_coef_no_sub_white.csv", argv[PARAM_RESULTS]);
           result_file[METRIC_CORRELATION_COEF_NO_SUB_WHITE] = fopen(str, "w");
+        } else if (strcmp(argv[i], "CORRELATION_COEF_LOWPASS") == 0) {
+          sprintf(str, "%s_corr_coef_lowpass_%d_%d.csv", argv[PARAM_RESULTS], white_height, white_width);
+          result_file[METRIC_CORRELATION_COEF_LOWPASS] = fopen(str, "w");
+        } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_LOWPASS") == 0) {
+          sprintf(str, "%s_corr_coef_no_sub_lowpass_%d_%d.csv", argv[PARAM_RESULTS], white_height, white_width);
+          result_file[METRIC_CORRELATION_COEF_NO_SUB_LOWPASS] = fopen(str, "w");
+        } else if (strcmp(argv[i], "CORRELATION_COEF_LOWPASS_BLOCKS") == 0) {
+          sprintf(str, "%s_corr_coef_lowpass_%d_%d_blocks_%d_%d.csv", argv[PARAM_RESULTS], white_height, white_width, white_x, white_y);
+          result_file[METRIC_CORRELATION_COEF_LOWPASS_BLOCKS] = fopen(str, "w");
+        } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS") == 0) {
+          sprintf(str, "%s_corr_coef_no_sub_lowpass_%d_%d_blocks_%d_%d.csv", argv[PARAM_RESULTS], white_height, white_width, white_x, white_y);
+          result_file[METRIC_CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS] = fopen(str, "w");
         } else if (strcmp(argv[i], "YUV_DIFF") == 0) {
           sprintf(str, "%s_diff.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_DIFF] = fopen(str, "wb");
@@ -484,6 +500,27 @@ int main (int argc, const char *argv[])
           // New: compute correlation coefficient (no sub) WHITE
           result[METRIC_CORRELATION_COEF_NO_SUB_WHITE] = correlation->compute_correlation_coefficient(original_frame, processed_frame, white_x, white_y, white_width, white_height);
         }
+
+        if (result_file[METRIC_CORRELATION_COEF_NO_SUB_LOWPASS] != NULL) {
+          // New: compute correlation coefficient (no sub) LOWPASS
+          result[METRIC_CORRELATION_COEF_NO_SUB_LOWPASS] = correlation->compute_correlation_coefficient_lowpass(original_frame, processed_frame, white_height, white_width);
+        }
+
+        if (result_file[METRIC_CORRELATION_COEF_LOWPASS] != NULL) {
+          // New: compute correlation coefficient LOWPASS
+          result[METRIC_CORRELATION_COEF_LOWPASS] = correlation->compute_correlation_coefficient_subtract_lowpass(original_frame, processed_frame, extra_frame, white_height, white_width);
+        }
+
+        if (result_file[METRIC_CORRELATION_COEF_LOWPASS_BLOCKS] != NULL) {
+          // New: compute correlation coefficient LOWPASS BLOCKS
+          result[METRIC_CORRELATION_COEF_LOWPASS_BLOCKS] = correlation->compute_correlation_coefficient_subtract_lowpass_blocks(original_frame, processed_frame, extra_frame, white_height, white_width, white_x, white_y);
+        }
+
+        if (result_file[METRIC_CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS] != NULL) {
+          // New: compute correlation coefficient no sub  LOWPASS BLOCKS
+          result[METRIC_CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS] = correlation->compute_correlation_coefficient_lowpass_blocks(original_frame, processed_frame, white_height, white_width, white_x, white_y);
+        }
+
 
         //printf("0\n");
         if (result_file[METRIC_YUV_DIFF] != NULL) {
