@@ -25,8 +25,8 @@
 
 /**************************************************************************
 
- Usage:
-  VQMT.exe OriginalVideo ProcessedVideo ExtraVideo Height Width NumberOfFrames ChromaFormat Output Metrics
+ Old Usage:
+  VQMT.exe OriginalVideo ProcessedVideo Height Width NumberOfFrames ChromaFormat Output Metrics
 
   OriginalVideo: the original video as raw YUV video file, progressively scanned, and 8 bits per sample
   ProcessedVideo: the processed video as raw YUV video file, progressively scanned, and 8 bits per sample
@@ -45,15 +45,65 @@
    - PSNRHVS: Peak Signal-to-Noise Ratio taking into account Contrast Sensitivity Function (CSF) (PSNR-HVS)
    - PSNRHVSM: Peak Signal-to-Noise Ratio taking into account Contrast Sensitivity Function (CSF) and between-coefficient contrast masking of DCT basis functions (PSNR-HVS-M)
 
- Example:
-  VQMT.exe original.yuv processed.yuv " " 1088 1920 250 1 results PSNR SSIM MSSSIM VIFP
-  + Whitebox:
-  VQMT.exe original.yuv processed.yuv " " 1088 1920 X Y W H 250 1 results PSNR SSIM MSSSIM VIFP
-  will create the following output files in CSV (comma-separated values) format:
-  - results_pnsr.csv
-  - results_ssim.csv
-  - results_msssim.csv
-  - results_vifp.csv
+Example:
+   VQMT.exe original.yuv processed.yuv " " 1088 1920 250 1 results PSNR SSIM MSSSIM VIFP
+   will create the following output files in CSV (comma-separated values) format:
+   - results_pnsr.csv
+   - results_ssim.csv
+   - results_msssim.csv
+   - results_vifp.csv
+
+
+*************
+New Usage (with adaptations Hannes):
+   VQMT.exe OriginalVideo ProcessedVideo ExtraVideo Height Width White_X White_Y White_Width White_Height NumberOfFrames ChromaFormat Output Metrics
+
+   Whitebox args: Calculates metric only over whiteboxed area
+                  only works with metrics that end with _WHITE and _LOWPASS. 
+                  Set to random value if not needed.
+    White_X: X-coordinate of whitebox - Also used for BLOCK_WIDTH in LOWPASS_BLOCKS
+    White_Y: Y-coordinate of whitebox - Also used for BLOCK_HEIGHT in LOWPASS_BLOCKS
+    White_Width: Width of whitebox
+    White_Height: Height of whitebox
+
+   ExtraVideo: extra video that will first be subtracted from both OriginalVideo and ProcessedVideo.
+               Will only be subtracted if used with following metrics: HIST_DIFF, SSIM_HIST_DIFF, CORRELATION_LIN, CORRELATION_NORM, CORRELATION_COEF, CORRELATION_COEF_LOWPASS, CORRELATION_COEF_LOWPASS_BLOCKS
+               Set to " " if you don't use it with those metrics
+
+   More available metrics:
+    - ABS_ERR: sum of absolute differences (or sum of absolute errors)
+    - ABS_ERR_WHITE: sum of absolute differences without whitebox
+
+    - CORRELATION_LIN: linear correlation, with subtraction of ExtraVideo
+    - CORRELATION_NORM: normalized correlation, with subtraction of ExtraVideo
+    - CORRELATION_COEF: correlation coefficient, with subtraction of ExtraVideo
+    - CORRELATION_LIN_NO_SUB: same as CORRELATION_LIN, but without subtraction
+    - CORRELATION_NORM_NO_SUB: same as CORRELATION_NORM, but without subtraction
+    - CORRELATION_COEF_NO_SUB: same as CORRELATION_COEF, but without subtraction
+
+    - CORRELATION_COEF_NO_SUB_WHITE: : same as CORRELATION_COEF_NO_SUB, but only taken over whitebox
+    - CORRELATION_COEF_NO_SUB_LOWPASS: same as CORRELATION_COEF_NO_SUB, but only taken over lowpassed DCT coefficients (lowpass set to whitebox width and height)
+    - CORRELATION_COEF_LOWPASS: same as CORRELATION_COEF_NO_SUB, but with subtraction
+    - CORRELATION_COEF_LOWPASS_BLOCKS: same as CORRELATION_COEF_LOWPASS, but DCT coefficients split in blocks (block width and block height set with white_x and white_y params),
+                                       then taken over lowpass coefficients of every block  (lowpass set to whitebox width and height)
+    - CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS: same as CORRELATION_COEF_LOWPASS_BLOCKS, but without subtraction
+
+    - HIST: histogram of differences (MSE)
+    - HIST_DIFF: histogram of differences (MSE) per block, for several block sizes
+    - SSIM_HIST_DIFF: same as HIST_DIFF, but using SSIM
+
+    - YUV_DIFF: creates new YUV that visualizes difference (like YUVToolkit, using PSNR)
+    - YUV_DIFF_MSE: creates new YUV that visualizes difference (like YUVToolkit, using MSE)
+    
+
+  Example correlation coefficient (DEFAULT, USED IN MY PUBLISHED PAPER):
+  VQMT.exe original.yuv processed.yuv " " 1080 1920 0 0 0 0 250 1 orig_vs_processed CORRELATION_COEF_NO_SUB
+
+  Example Whitebox (only taking block of 20x80 pixels in lower-right corner):
+  VQMT.exe original.yuv processed.yuv " " 1080 1920 1900 1000 20 80 250 1 results ABS_ERR_WHITE
+
+  Example lowpass blocks (blocks of size 8x8, then lowpass 2x2 DCT coefficients of every block)
+  VQMT.exe original.yuv processed.yuv " " 1080 1920 2 2 8 8 250 1 results CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS
 
  Notes:
  - SSIM comes for free when MSSSIM is computed (but you still need to specify it to get the output)
