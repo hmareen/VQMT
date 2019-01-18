@@ -94,6 +94,9 @@ New Usage (with adaptations Hannes):
 
     - YUV_DIFF: creates new YUV that visualizes difference (like YUVToolkit, using PSNR)
     - YUV_DIFF_MSE: creates new YUV that visualizes difference (like YUVToolkit, using MSE)
+    - YUV_SUBTRACT_DIFF: creates new YUV = extra + (original - processed)
+                         For example, if processed = watermarked in uncompressed domain and extra = watermarked + compressed
+                         Then this can serve as an attack to delete the watermark out of the compressed video.
     
 
   Example correlation coefficient (DEFAULT, USED IN MY PUBLISHED PAPER):
@@ -104,6 +107,12 @@ New Usage (with adaptations Hannes):
 
   Example lowpass blocks (blocks of size 8x8, then lowpass 2x2 DCT coefficients of every block)
   VQMT.exe original.yuv processed.yuv " " 1080 1920 2 2 8 8 250 1 results CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS
+
+  Example yuv diff (visualization of original - processed)
+  VQMT.exe original.yuv processed.yuv " " 1080 1920 0 0 0 0 250 1 original_vs_processed YUV_DIFF
+
+  Example yuv subtract diff
+  VQMT.exe original.yuv processed.yuv extra.yuv 1080 1920 0 0 0 0 250 1 extra YUV_SUBTRACT_DIFF
 
  Notes:
  - SSIM comes for free when MSSSIM is computed (but you still need to specify it to get the output)
@@ -174,6 +183,7 @@ enum Metrics {
     METRIC_SSIM_HIST_DIFF,
     METRIC_YUV_DIFF,
     METRIC_YUV_DIFF_MSE,
+    METRIC_YUV_SUBTRACT_DIFF,
     METRIC_SIZE
 };
 
@@ -351,6 +361,9 @@ int main (int argc, const char *argv[])
         } else if (strcmp(argv[i], "YUV_DIFF_MSE") == 0) {
           sprintf(str, "%s_diff_mse.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_DIFF_MSE] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_SUBTRACT_DIFF") == 0) {
+          sprintf(str, "%s_subtract_diff.yuv", argv[PARAM_RESULTS]);
+          result_file[METRIC_YUV_SUBTRACT_DIFF] = fopen(str, "wb");
         }
 	}
 	delete[] str;
@@ -419,9 +432,14 @@ int main (int argc, const char *argv[])
 
     cv::Mat original_frame(height, width, CV_32F), processed_frame(height, width, CV_32F);
     cv::Mat extra_frame(height, width, CV_32F);
+    
+    int u_height = original->comp_height[1];
+    int u_width = original->comp_width[1];
+    int v_height = original->comp_height[2];
+    int v_width = original->comp_width[2];
     cv::Mat y(height, width, CV_8U);
-    cv::Mat u(height, width, CV_8U), v(height, width, CV_8U); // YUV444 output
-    //cv::Mat u(height / 2, width / 2, CV_8U), v(height / 2, width / 2, CV_8U); // YUV420 output doesnt give expected results for some reason
+    //cv::Mat u(height, width, CV_8U), v(height, width, CV_8U); // YUV444 output
+    cv::Mat u(u_height, u_width, CV_8U), v(v_height, v_width, CV_8U); // YUV420 output
 	float result[METRIC_SIZE_1_VALUE] = {0};
     float result_avg[METRIC_SIZE_1_VALUE] = { 0 };
 
@@ -584,6 +602,36 @@ int main (int argc, const char *argv[])
           bool mse_or_psnr = 0; // mse
           yuvDiff->calculate_and_map_differences(original_frame, processed_frame, y, u, v, mse_or_psnr);
           yuvDiff->write_yuv(result_file[METRIC_YUV_DIFF_MSE], y, u, v);
+        }
+
+        if (result_file[METRIC_YUV_SUBTRACT_DIFF] != NULL) {
+          // New: write the subtract difference YUV
+          
+          // Get 8bit y component as 8 bit unsigned instead of 32bit floats
+          cv::Mat original_frame_8b(height, width, CV_8U), processed_frame_8b(height, width, CV_8U);
+          cv::Mat extra_frame_8b(height, width, CV_8U);
+          original->getLuma(original_frame_8b, CV_8U);
+          processed->getLuma(processed_frame_8b, CV_8U);
+          extra->getLuma(extra_frame_8b, CV_8U);
+
+          // Also grab u and v components
+          cv::Mat original_frame_u(u_height, u_width, CV_8U), processed_frame_u(u_height, u_width, CV_8U), extra_frame_u(u_height, u_width, CV_8U);
+          cv::Mat original_frame_v(v_height, v_width, CV_8U), processed_frame_v(v_height, v_width, CV_8U), extra_frame_v(v_height, v_width, CV_8U);
+
+          original->getChroma0(original_frame_u, CV_8U);
+          processed->getChroma0(processed_frame_u, CV_8U);
+          extra->getChroma0(extra_frame_u, CV_8U);
+          original->getChroma1(original_frame_v, CV_8U);
+          processed->getChroma1(processed_frame_v, CV_8U);
+          extra->getChroma1(extra_frame_v, CV_8U);
+          
+          // Calculate and subtract differences
+          yuvDiff->calculate_and_subtract_differences(original_frame_8b, processed_frame_8b, extra_frame_8b, y);
+          yuvDiff->calculate_and_subtract_differences(original_frame_u, processed_frame_u, extra_frame_u, u);
+          yuvDiff->calculate_and_subtract_differences(original_frame_v, processed_frame_v, extra_frame_v, v);
+
+          // Write resulting yuv file
+          yuvDiff->write_yuv(result_file[METRIC_YUV_SUBTRACT_DIFF], y, u, v);
         }
 
 		// Print quality index to file

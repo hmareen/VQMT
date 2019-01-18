@@ -61,7 +61,7 @@ VideoYUV::VideoYUV(const char *f, int h, int w, int nbf, int chroma_format)
 		comp_height[2] = comp_height[1] = h;
 		comp_width [2] = comp_width [1] = w >> 1;
 	}
-	else {
+	else { // CHROMA_SUBSAMP_444
 		comp_height[2] = comp_height[1] = h;
 		comp_width [2] = comp_width [1] = w;
 	}
@@ -111,4 +111,26 @@ void VideoYUV::getLuma(cv::Mat& local_luma, int type)
 	else {
 		tmp.convertTo(local_luma, type);
 	}
+}
+
+void VideoYUV::getChroma0(cv::Mat& local_chroma, int type)
+{
+  cv::Mat tmp(comp_height[1], comp_width[1], CV_8UC1, this->chroma[0]);
+  if (type == CV_8UC1) {
+    tmp.copyTo(local_chroma);
+  }
+  else {
+    tmp.convertTo(local_chroma, type);
+  }
+}
+
+void VideoYUV::getChroma1(cv::Mat& local_chroma, int type)
+{
+  cv::Mat tmp(comp_height[2], comp_width[2], CV_8UC1, this->chroma[1]);
+  if (type == CV_8UC1) {
+    tmp.copyTo(local_chroma);
+  }
+  else {
+    tmp.convertTo(local_chroma, type);
+  }
 }

@@ -68,13 +68,17 @@ public:
 	// Get the luma component
 	// readOneFrame() needs to be called before getLuma()
 	void getLuma(cv::Mat& luma, int type = CV_8UC1);
+  void getChroma0(cv::Mat& chroma0, int type = CV_8UC1);
+  void getChroma1(cv::Mat& chroma1, int type = CV_8UC1);
+
+  int comp_height[3];	// height in specific component
+  int comp_width[3];	// width in specific component
 private:
 	int file;		// file stream
 	int nbframes;		// number of frames
 	int height;		// height
 	int width;		// width
-	int comp_height[3];	// height in specific component
-	int comp_width[3];	// width in specific component
+
 
 	int size;		// number of samples
 	int comp_size[3];	// number of samples in specific component

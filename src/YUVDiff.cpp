@@ -1,6 +1,9 @@
 #include "YUVDiff.hpp"
 #include "VideoYUV.hpp"
 
+#include <stdio.h>
+#include <iostream>
+
 YUVDiff::YUVDiff(int h, int w)
 {
   height = h;
@@ -144,15 +147,29 @@ void YUVDiff::calculate_and_map_differences(const cv::Mat & original, const cv::
       v = RGB2V(r, g, b);
 
       diff_y.at<unsigned char>(i, j) = y;
-      diff_u.at<unsigned char>(i, j) = u;
-      diff_v.at<unsigned char>(i, j) = v;
 
-      // YUV422 doesnt give expected results for some reason
-      //diff_u.at<unsigned char>(i/2, j/2) = u;
-      //diff_v.at<unsigned char>(i/2, j/2) = v;
+      // YUV420
+      diff_u.at<unsigned char>(i/2, j/2) = u;
+      diff_v.at<unsigned char>(i/2, j/2) = v;
+
+      //YUV 444
+      //diff_u.at<unsigned char>(i, j) = u;
+      //diff_v.at<unsigned char>(i, j) = v;
 
     }
   }
+}
+
+/* Calculate the difference between original and processed, and subtract that from extra */
+void YUVDiff::calculate_and_subtract_differences(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& extra, cv::Mat& subtract_diff) {
+  // We need to temporary convert to 16-bit signed!
+  cv::Mat tmp(original.rows, original.cols, CV_16S);
+  // First find the difference between original and processed
+  cv::subtract(original, processed, tmp, cv::noArray(), CV_16S);
+
+  // Then, subtract this difference from extra
+  // (or actually, add, because we subtract original - processed, and not processed - original)
+  cv::add(extra, tmp, subtract_diff, cv::noArray(), CV_8U);
 }
 
 void YUVDiff::write_yuv(FILE* file, const cv::Mat& diff_y, const cv::Mat& diff_u, const cv::Mat& diff_v) {
