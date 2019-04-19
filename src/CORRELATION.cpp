@@ -54,11 +54,16 @@ float CORRELATION::compute_correlation_coefficient(const cv::Mat& original, cons
   cv::Mat original_tmp = original.clone();
   cv::Mat processed_tmp = processed.clone();
 
+
+  // TODO: it would be better to not include the whitebox at all, instead of just setting it to 0
+  // But for now, its enough
   // Set whitebox all to zero
   for (int i = white_x; i < white_x + white_width; i++) {
     for (int j = white_y; j < white_y + white_height; j++) {
-      original_tmp.at<float>(j, i, 0) = 0;
-      processed_tmp.at<float>(j, i, 0) = 0;
+      if (i < width && j < height) {
+        original_tmp.at<float>(j, i, 0) = 0;
+        processed_tmp.at<float>(j, i, 0) = 0;
+      }
     }
   }
 
@@ -123,9 +128,126 @@ float CORRELATION::compute_correlation_coefficient_subtract(const cv::Mat& origi
     cv::normalize(original_tmp, original_tmp);
     cv::normalize(processed_tmp, processed_tmp);
 
+    /*
+    double original_min, original_max, processed_min, processed_max, minimum;
+    cv::minMaxLoc(original_tmp, &original_min, &original_max);
+    cv::minMaxLoc(processed_tmp, &processed_min, &processed_max);
+    minimum = cv::min(original_min, processed_min);
+    cv::add(original_tmp, minimum, original_tmp);
+    cv::add(processed_tmp, minimum, processed_tmp);
+    */
+
+    /*
+    float factor_threshold_std_min = 0.25;
+    float factor_threshold_std_max = 0.75;
+    cv::Scalar original_mean, original_stddev, processed_mean, processed_stddev;
+    cv::meanStdDev(original_tmp, original_mean, original_stddev);
+    cv::meanStdDev(processed_tmp, processed_mean, processed_stddev);
+    float threshold_min = factor_threshold_std_min * original_stddev.val[0];
+    cv::Mat orig_mask_zero_min = original_tmp < original_mean.val[0] + threshold_min & original_tmp > original_mean.val[0] - threshold_min;
+    original_tmp.setTo(0, orig_mask_zero_min);  // Multiplication with 0 = 0
+    float threshold_max = factor_threshold_std_max * original_stddev.val[0];
+    cv::Mat orig_mask_zero_max = original_tmp > original_mean.val[0] + threshold_max & original_tmp < original_mean.val[0] - threshold_max;
+    original_tmp.setTo(0, orig_mask_zero_max);  // Multiplication with 0 = 0
+    */
     // Calculate correlation
     cv::multiply(original_tmp, processed_tmp, original_tmp);
-    return cv::sum(original_tmp).val[0];
+    //cv::subtract(original_tmp, processed_tmp, original_tmp);
+    // / (width * height)
+    return cv::sum(cv::abs(original_tmp)).val[0];
+}
+
+float CORRELATION::compute_correlation_coefficient_binarized(const cv::Mat& original, const cv::Mat& processed, float factor_threshold_std) {
+  cv::Mat original_tmp(height, width, CV_32F);
+  cv::Mat processed_tmp(height, width, CV_32F);
+
+  // Subtract mean
+  cv::subtract(original, cv::mean(original_tmp).val[0], original_tmp);
+  cv::subtract(processed, cv::mean(processed_tmp).val[0], processed_tmp);
+
+  // Normalize (=divide by sum of squares (= euclidean length)
+  cv::normalize(original_tmp, original_tmp);
+  cv::normalize(processed_tmp, processed_tmp);
+
+  // Binarize to +1, -1
+  //float original_mean = cv::mean(original_tmp).val[0];
+  //float processed_mean = cv::mean(processed_tmp).val[0];
+  //cv::threshold(original_tmp, original_tmp, original_mean.val[0], 1, cv::THRESH_BINARY);
+  //cv::threshold(processed_tmp, processed_tmp, processed_mean.val[0], 1, cv::THRESH_BINARY);
+  //original_tmp.setTo(-1, original_tmp == 0);
+  //processed_tmp.setTo(-1, processed_tmp == 0);
+
+  cv::Scalar original_mean, original_stddev, processed_mean, processed_stddev;
+  cv::meanStdDev(original_tmp, original_mean, original_stddev);
+  cv::meanStdDev(processed_tmp, processed_mean, processed_stddev);
+  float threshold = factor_threshold_std * original_stddev.val[0];
+  //cv::Mat orig_mask_pos = original_tmp >= original_mean.val[0] + threshold;
+  //cv::Mat orig_mask_neg = original_tmp <= original_mean.val[0] - threshold;
+  cv::Mat orig_mask_zero = original_tmp < original_mean.val[0] + threshold & original_tmp >  original_mean.val[0] - threshold;
+  int orig_mask_zero_size = cv::sum(orig_mask_zero).val[0];
+  //printf("orig_mask_zero size: %d\n", orig_mask_zero_size);
+  cv::threshold(original_tmp, original_tmp, original_mean.val[0], 1, cv::THRESH_BINARY);
+  original_tmp.setTo(-1, original_tmp == 0);
+  original_tmp.setTo(0, orig_mask_zero);  // Multiplication with 0 = 0
+  //original_tmp.setTo(+1, orig_mask_pos);
+  //original_tmp.setTo(-1, orig_mask_neg);
+
+  cv::threshold(processed_tmp, processed_tmp, processed_mean.val[0], 1, cv::THRESH_BINARY);
+  processed_tmp.setTo(-1, processed_tmp == 0);
+
+  // Calculate correlation
+  cv::multiply(original_tmp, processed_tmp, original_tmp);
+  return cv::sum(original_tmp).val[0] / ((height * width) - orig_mask_zero_size);
+}
+
+float CORRELATION::compute_correlation_coefficient_subtract_binarized(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& subtract, float factor_threshold_std) {
+  cv::Mat original_tmp(height, width, CV_32F);
+  cv::Mat processed_tmp(height, width, CV_32F);
+
+  // Subtract
+  cv::subtract(original, subtract, original_tmp);
+  cv::subtract(processed, subtract, processed_tmp);
+
+  // Subtract mean
+  cv::subtract(original_tmp, cv::mean(original_tmp).val[0], original_tmp);
+  cv::subtract(processed_tmp, cv::mean(processed_tmp).val[0], processed_tmp);
+
+  // Normalize (=divide by sum of squares (= euclidean length)
+  cv::normalize(original_tmp, original_tmp);
+  cv::normalize(processed_tmp, processed_tmp);
+
+  // Binarize to +1, -1
+  //float original_mean = cv::mean(original_tmp).val[0];
+  //float processed_mean = cv::mean(processed_tmp).val[0];
+  //cv::threshold(original_tmp, original_tmp, original_mean.val[0], 1, cv::THRESH_BINARY);
+  //cv::threshold(processed_tmp, processed_tmp, processed_mean.val[0], 1, cv::THRESH_BINARY);
+  //original_tmp.setTo(-1, original_tmp == 0);
+  //processed_tmp.setTo(-1, processed_tmp == 0);
+
+  cv::Scalar original_mean, original_stddev, processed_mean, processed_stddev;
+  cv::meanStdDev(original_tmp, original_mean, original_stddev);
+  cv::meanStdDev(processed_tmp, processed_mean, processed_stddev);
+
+  printf("orig: %f %f\n", original_mean.val[0], original_stddev.val[0]);
+  printf("processed: %f %f\n", processed_mean.val[0], processed_stddev.val[0]);
+  float threshold = factor_threshold_std * original_stddev.val[0];
+  //cv::Mat orig_mask_pos = original_tmp >= original_mean.val[0] + threshold;
+  //cv::Mat orig_mask_neg = original_tmp <= original_mean.val[0] - threshold;
+  cv::Mat orig_mask_zero = original_tmp < original_mean.val[0] + threshold & original_tmp >  original_mean.val[0] - threshold;
+  int orig_mask_zero_size = cv::sum(orig_mask_zero).val[0] / 255;
+  //printf("orig_mask_zero size: %d\n", orig_mask_zero_size);
+  cv::threshold(original_tmp, original_tmp, original_mean.val[0], 1, cv::THRESH_BINARY);
+  original_tmp.setTo(-1, original_tmp == 0);
+  original_tmp.setTo(0, orig_mask_zero); // Multiplication with 0 = 0
+  //original_tmp.setTo(+1, orig_mask_pos);
+  //original_tmp.setTo(-1, orig_mask_neg);
+
+  cv::threshold(processed_tmp, processed_tmp, processed_mean.val[0], 1, cv::THRESH_BINARY);
+  processed_tmp.setTo(-1, processed_tmp == 0);
+
+  // Calculate correlation
+  cv::multiply(original_tmp, processed_tmp, original_tmp);
+  return cv::sum(original_tmp).val[0] / ((height * width) - orig_mask_zero_size);
 }
 
 float CORRELATION::compute_correlation_coefficient_lowpass(const cv::Mat& original, const cv::Mat& processed, int lowpass_height, int lowpass_width, int total_height, int total_width) {

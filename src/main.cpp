@@ -172,11 +172,15 @@ enum Metrics {
     METRIC_CORRELATION_LIN_NO_SUB,
     METRIC_CORRELATION_NORM_NO_SUB,
     METRIC_CORRELATION_COEF_NO_SUB,
+    METRIC_CORRELATION_COEF_NO_SUB_WCHROMA,
+    METRIC_CORRELATION_COEF_NO_SUB_WCHROMA_WHITE,
     METRIC_CORRELATION_COEF_NO_SUB_WHITE,
     METRIC_CORRELATION_COEF_NO_SUB_LOWPASS,
     METRIC_CORRELATION_COEF_LOWPASS,
     METRIC_CORRELATION_COEF_LOWPASS_BLOCKS,
     METRIC_CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS,
+    METRIC_CORRELATION_COEF_BINARIZED,
+    METRIC_CORRELATION_COEF_NO_SUB_BINARIZED,
     METRIC_SIZE_1_VALUE,
     METRIC_HIST,
     METRIC_HIST_DIFF,
@@ -203,6 +207,8 @@ int main (int argc, const char *argv[])
 		fprintf(stderr, "Check software usage: at least %d parameters are required.\n", PARAM_SIZE);
 		return EXIT_FAILURE;
 	}
+
+  bool with_chroma = false;
 
 	double duration = static_cast<double>(cv::getTickCount());
 
@@ -340,8 +346,17 @@ int main (int argc, const char *argv[])
         } else if(strcmp(argv[i], "CORRELATION_COEF_NO_SUB") == 0) {
             sprintf(str, "%s_corr_coef_no_sub.csv", argv[PARAM_RESULTS]);
             result_file[METRIC_CORRELATION_COEF_NO_SUB] = fopen(str, "w");
+        } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_WCHROMA") == 0) {
+          with_chroma = true;
+          sprintf(str, "%s_corr_coef_no_sub_wchroma.csv", argv[PARAM_RESULTS]);
+          result_file[METRIC_CORRELATION_COEF_NO_SUB_WCHROMA] = fopen(str, "w");
+        }
+        else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_WCHROMA_WHITE") == 0) {
+          with_chroma = true;
+          sprintf(str, "%s_corr_coef_no_sub_wchroma_white_%d_%d_%d_%d.csv", argv[PARAM_RESULTS], white_x, white_y, white_width, white_height);
+          result_file[METRIC_CORRELATION_COEF_NO_SUB_WCHROMA] = fopen(str, "w");
         } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_WHITE") == 0) {
-          sprintf(str, "%s_corr_coef_no_sub_white.csv", argv[PARAM_RESULTS]);
+          sprintf(str, "%s_corr_coef_no_sub_white_%d_%d_%d_%d.csv", argv[PARAM_RESULTS], white_x, white_y, white_width, white_height);
           result_file[METRIC_CORRELATION_COEF_NO_SUB_WHITE] = fopen(str, "w");
         } else if (strcmp(argv[i], "CORRELATION_COEF_LOWPASS") == 0) {
           sprintf(str, "%s_corr_coef_lowpass_%d_%d.csv", argv[PARAM_RESULTS], white_height, white_width);
@@ -355,6 +370,12 @@ int main (int argc, const char *argv[])
         } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS") == 0) {
           sprintf(str, "%s_corr_coef_no_sub_lowpass_%d_%d_blocks_%d_%d.csv", argv[PARAM_RESULTS], white_height, white_width, white_x, white_y);
           result_file[METRIC_CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS] = fopen(str, "w");
+        } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_BINARIZED") == 0) {
+          sprintf(str, "%s_corr_coef_no_sub_binarized.csv", argv[PARAM_RESULTS]);
+          result_file[METRIC_CORRELATION_COEF_NO_SUB_BINARIZED] = fopen(str, "w");
+        } else if (strcmp(argv[i], "CORRELATION_COEF_BINARIZED") == 0) {
+          sprintf(str, "%s_corr_coef_binarized.csv", argv[PARAM_RESULTS]);
+          result_file[METRIC_CORRELATION_COEF_BINARIZED] = fopen(str, "w");
         } else if (strcmp(argv[i], "YUV_DIFF") == 0) {
           sprintf(str, "%s_diff.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_DIFF] = fopen(str, "wb");
@@ -437,10 +458,21 @@ int main (int argc, const char *argv[])
     int u_width = original->comp_width[1];
     int v_height = original->comp_height[2];
     int v_width = original->comp_width[2];
+
+    // CHROMA
+    CORRELATION *correlation_chroma_u = new CORRELATION(u_height, u_width);
+    cv::Mat original_frame_chroma_u(u_height, u_width, CV_32F), processed_frame_chroma_u(u_height, u_width, CV_32F);
+    cv::Mat extra_frame_chroma_u(u_height, u_width, CV_32F);
+    CORRELATION *correlation_chroma_v = new CORRELATION(v_height, v_width);
+    cv::Mat original_frame_chroma_v(v_height, v_width, CV_32F), processed_frame_chroma_v(v_height, v_width, CV_32F);
+    cv::Mat extra_frame_chroma_v(v_height, v_width, CV_32F);
+
+    // for YUV_DIFF_ variants
     cv::Mat y(height, width, CV_8U);
     //cv::Mat u(height, width, CV_8U), v(height, width, CV_8U); // YUV444 output
     cv::Mat u(u_height, u_width, CV_8U), v(v_height, v_width, CV_8U); // YUV420 output
-	float result[METRIC_SIZE_1_VALUE] = {0};
+
+	  float result[METRIC_SIZE_1_VALUE] = {0};
     float result_avg[METRIC_SIZE_1_VALUE] = { 0 };
 
     int histBuffer[256] = { 0 };
@@ -472,10 +504,23 @@ int main (int argc, const char *argv[])
 		original->getLuma(original_frame, CV_32F);
 		if (!processed->readOneFrame()) exit(EXIT_FAILURE);
 		processed->getLuma(processed_frame, CV_32F);
-        if(strlen(argv[PARAM_EXTRA]) > 1) {
-            if(!extra->readOneFrame()) exit(EXIT_FAILURE);
-            extra->getLuma(extra_frame, CV_32F);
-        }
+    if(strlen(argv[PARAM_EXTRA]) > 1) {
+        if(!extra->readOneFrame()) exit(EXIT_FAILURE);
+        extra->getLuma(extra_frame, CV_32F);
+    }
+
+    if (with_chroma) {
+      original->getChroma0(original_frame_chroma_u, CV_32F);
+      processed->getChroma0(processed_frame_chroma_u, CV_32F);
+      if (strlen(argv[PARAM_EXTRA]) > 1) {
+        extra->getChroma0(extra_frame_chroma_u, CV_32F);
+      }
+      original->getChroma1(original_frame_chroma_v, CV_32F);
+      processed->getChroma1(processed_frame_chroma_v, CV_32F);
+      if (strlen(argv[PARAM_EXTRA]) > 1) {
+        extra->getChroma1(extra_frame_chroma_v, CV_32F);
+      }
+    }
 
 		// Compute PSNR
 		if (result_file[METRIC_PSNR] != NULL) {
@@ -564,9 +609,24 @@ int main (int argc, const char *argv[])
             // New: compute correlation coefficient (no sub)
             result[METRIC_CORRELATION_COEF_NO_SUB] = correlation->compute_correlation_coefficient(original_frame, processed_frame);
         }
+        if (result_file[METRIC_CORRELATION_COEF_NO_SUB_WCHROMA] != NULL) {
+          // New: compute correlation coefficient (no sub), with chroma
+          float corr_luma = correlation->compute_correlation_coefficient(original_frame, processed_frame);
+          float corr_chroma_u = correlation_chroma_u->compute_correlation_coefficient(original_frame_chroma_u, processed_frame_chroma_u);
+          float corr_chroma_v = correlation_chroma_v->compute_correlation_coefficient(original_frame_chroma_v, processed_frame_chroma_v);
+          result[METRIC_CORRELATION_COEF_NO_SUB_WCHROMA] = (corr_luma*4 + corr_chroma_u + corr_chroma_v) / (4 + 1 + 1);
+        }
         if (result_file[METRIC_CORRELATION_COEF_NO_SUB_WHITE] != NULL) {
           // New: compute correlation coefficient (no sub) WHITE
           result[METRIC_CORRELATION_COEF_NO_SUB_WHITE] = correlation->compute_correlation_coefficient(original_frame, processed_frame, white_x, white_y, white_width, white_height);
+        }
+
+        if (result_file[METRIC_CORRELATION_COEF_NO_SUB_WCHROMA_WHITE] != NULL) {
+          // New: compute correlation coefficient (no sub), witch chroma and WHITE
+          float corr_luma = correlation->compute_correlation_coefficient(original_frame, processed_frame, white_x, white_y, white_width, white_height);
+          float corr_chroma_u = correlation_chroma_u->compute_correlation_coefficient(original_frame_chroma_u, processed_frame_chroma_u, white_x, white_y, white_width, white_height);
+          float corr_chroma_v = correlation_chroma_v->compute_correlation_coefficient(original_frame_chroma_v, processed_frame_chroma_v, white_x, white_y, white_width, white_height);
+          result[METRIC_CORRELATION_COEF_NO_SUB_WCHROMA_WHITE] = (corr_luma * 4 + corr_chroma_u + corr_chroma_v) / (4 + 1 + 1);
         }
 
         if (result_file[METRIC_CORRELATION_COEF_NO_SUB_LOWPASS] != NULL) {
@@ -587,6 +647,18 @@ int main (int argc, const char *argv[])
         if (result_file[METRIC_CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS] != NULL) {
           // New: compute correlation coefficient no sub  LOWPASS BLOCKS
           result[METRIC_CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS] = correlation->compute_correlation_coefficient_lowpass_blocks(original_frame, processed_frame, white_height, white_width, white_x, white_y);
+        }
+
+        //float factor_threshold_std = 0.0; // Set to 0 if want to keep all elements
+        float factor_threshold_std = 0.25;
+        if (result_file[METRIC_CORRELATION_COEF_NO_SUB_BINARIZED] != NULL) {
+          // New
+          result[METRIC_CORRELATION_COEF_NO_SUB_BINARIZED] = correlation->compute_correlation_coefficient_binarized(original_frame, processed_frame, factor_threshold_std);
+        }
+
+        if (result_file[METRIC_CORRELATION_COEF_BINARIZED] != NULL) {
+          // New
+          result[METRIC_CORRELATION_COEF_BINARIZED] = correlation->compute_correlation_coefficient_subtract_binarized(original_frame, processed_frame, extra_frame, factor_threshold_std);
         }
 
 
@@ -695,6 +767,8 @@ int main (int argc, const char *argv[])
 		if (result_file[m] != NULL) {
 			result_avg[m] /= static_cast<float>(nbframes);
 			fprintf(result_file[m], "average,%.6f", static_cast<double>(result_avg[m]));
+      // Also print to stdout
+      //printf("%.6f\n", static_cast<double>(result_avg[m]));
 			fclose(result_file[m]);
 		}
 	}
@@ -772,7 +846,7 @@ int main (int argc, const char *argv[])
 
 	duration = static_cast<double>(cv::getTickCount())-duration;
 	duration /= cv::getTickFrequency();
-	printf("Time: %0.3fs\n", duration);
+	//printf("Time: %0.3fs\n", duration);
 
 	return EXIT_SUCCESS;
 }
