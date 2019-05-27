@@ -1,4 +1,4 @@
-vqmt.exe .\BlowingBubbles_416x240_50_qp22.yuv .\BlowingBubbles_416x240_50_qp22_lr_w260993.yuv " " 416 240 0 0 0 0 500 1 result YUV_DIFF
+vqmt.exe .\BlowingBubbles_416x240_50_qp22.yuv .\BlowingBubbles_416x240_50_qp22_lr_w260993.yuv " " 240 416 0 0 0 0 500 1 result YUV_DIFF
     -> generates results_diff.yuv
 
 ffmpeg -f rawvideo -pix_fmt yuv444p -s:v 416x240 -i .\result_diff.yuv -c:v rawvideo -pix_fmt rgb24 .\result_diff.rgb

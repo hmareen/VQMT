@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <iostream>
 
+#include <stdlib.h> # rand
+#include <random>
+
 YUVDiff::YUVDiff(int h, int w)
 {
   height = h;
@@ -82,18 +85,19 @@ unsigned int colorMaps[][256] = {
 #define RGB2U2(R, G, B) CLIP(( ( -0.169 * (R) -  0.331 * (G) + 0.5 * (B) + 128)))
 #define RGB2V2(R, G, B) CLIP(( ( 0.5 * (R) -  0.419 * (G) -  0.081 * (B) + 128)))
 
-void YUVDiff::calculate_and_map_differences(const cv::Mat & original, const cv::Mat & processed, cv::Mat & diff_y, cv::Mat & diff_u, cv::Mat & diff_v, bool mse_or_psnr)
+void YUVDiff::calculate_and_map_differences(const cv::Mat & original, const cv::Mat & processed, const cv::Mat & subtract, cv::Mat & diff_y, cv::Mat & diff_u, cv::Mat & diff_v, int mse_or_psnr)
 {
   cv::Mat tmp(height, width, CV_32F);
   // MSE
   cv::subtract(original, processed, tmp);
   cv::multiply(tmp, tmp, tmp);
 
+  //printf("%f\n", cv::mean(tmp).val[0]);
   //bool mse_or_psnr = 0; // MSE
   //mse_or_psnr = 1; // PSNR
 
-  int lowerRange, upperRange, biggerValueIsBetter;
-  if (mse_or_psnr) { // PSNR
+  float lowerRange, upperRange, biggerValueIsBetter;
+  if (mse_or_psnr == 1) { // PSNR
     // c - 10.0*log10(mseData[i]);
     // = c - 10*ln(mseData)/ln(10)
     cv::Scalar c(20.0*log10(255.0));
@@ -102,13 +106,54 @@ void YUVDiff::calculate_and_map_differences(const cv::Mat & original, const cv::
     cv::multiply(tmp, tenDivLnTen, tmp);
     cv::add(tmp, c, tmp);
 
-    lowerRange = 22;
-    upperRange = 50;
+    lowerRange = 22.0;
+    upperRange = 50.0;
     biggerValueIsBetter = true;
-  } else { // MSE
-    lowerRange = 1;
+  }
+  else if (mse_or_psnr == 0) { // MSE
+    lowerRange = 1.0;
+    upperRange = 400.0;
+    biggerValueIsBetter = false;
+  }
+  else if (mse_or_psnr == 2) { // corr_coef
+    // Yes, this is copy-pasted from CORRELATION.cpp. Sue me.
+    cv::Mat original_tmp(height, width, CV_32F);
+    cv::Mat processed_tmp(height, width, CV_32F);
+
+    // Subtract
+    cv::subtract(original, subtract, original_tmp);
+    cv::subtract(processed, subtract, processed_tmp);
+
+    // Experimenting code, not working yet 
+
+    // Subtract mean
+    //cv::subtract(original_tmp, cv::mean(original_tmp).val[0], original_tmp);
+    //cv::subtract(processed_tmp, cv::mean(processed_tmp).val[0], processed_tmp);
+
+    // Normalize (=divide by sum of squares (= euclidean length)
+    //cv::normalize(original_tmp, original_tmp);
+    //cv::normalize(processed_tmp, processed_tmp);
+
+
+    //cv::multiply(original_tmp, processed_tmp, tmp);
+    for (int i = 0; i < height; i++) {
+      for (int j = 0; j < width; j++) {
+        //printf("(%d, %d): %f\n", i, j, tmp.at<float>(i, j));
+      }
+    }
+
+    printf("Sum: %f\n", cv::sum(tmp).val[0]);
+    double min, max;
+    cv::minMaxLoc(tmp, &min, &max);
+    printf("Max: %f\n", max);
+    printf("Min: %f\n", min);
+
+    lowerRange = 0;
     upperRange = 400;
     biggerValueIsBetter = false;
+  }
+ else {
+    printf("Undefined mse_or_psnr: %d\n", mse_or_psnr);
   }
  
   int colorIdx = 0; // for now there is only 1 color map
@@ -170,6 +215,23 @@ void YUVDiff::calculate_and_subtract_differences(const cv::Mat& original, const 
   // Then, subtract this difference from extra
   // (or actually, add, because we subtract original - processed, and not processed - original)
   cv::add(extra, tmp, subtract_diff, cv::noArray(), CV_8U);
+}
+
+void YUVDiff::randomly_change(const cv::Mat & original, int seed, float mean, float stdev, cv::Mat & new_noised)
+{
+  // First copy
+  original.copyTo(new_noised);
+
+  // Add random noise
+  //srand(seed);
+  std::default_random_engine de(seed);
+  std::normal_distribution<float> nd(mean, stdev);
+  for (int i = 0; i < original.rows; i++) {
+    for (int j = 0; j < original.cols; j++) {
+      // Add noise, but clip
+      new_noised.at<unsigned char>(i, j) = std::max(0, std::min(new_noised.at<unsigned char>(i, j) + int(nd(de)), 255));
+    }
+  }
 }
 
 void YUVDiff::write_yuv(FILE* file, const cv::Mat& diff_y, const cv::Mat& diff_u, const cv::Mat& diff_v) {

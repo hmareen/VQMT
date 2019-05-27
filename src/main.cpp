@@ -187,7 +187,9 @@ enum Metrics {
     METRIC_SSIM_HIST_DIFF,
     METRIC_YUV_DIFF,
     METRIC_YUV_DIFF_MSE,
+    METRIC_YUV_DIFF_CORR_COEF,
     METRIC_YUV_SUBTRACT_DIFF,
+    METRIC_YUV_CHANGE_U,
     METRIC_SIZE
 };
 
@@ -382,9 +384,15 @@ int main (int argc, const char *argv[])
         } else if (strcmp(argv[i], "YUV_DIFF_MSE") == 0) {
           sprintf(str, "%s_diff_mse.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_DIFF_MSE] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_DIFF_CORR_COEF") == 0) {
+          sprintf(str, "%s_diff_corr_coef.yuv", argv[PARAM_RESULTS]);
+          result_file[METRIC_YUV_DIFF_CORR_COEF] = fopen(str, "wb");
         } else if (strcmp(argv[i], "YUV_SUBTRACT_DIFF") == 0) {
           sprintf(str, "%s_subtract_diff.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_SUBTRACT_DIFF] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_CHANGE_U") == 0) {
+          sprintf(str, "%s_change_u.yuv", argv[PARAM_RESULTS]);
+          result_file[METRIC_YUV_CHANGE_U] = fopen(str, "wb");
         }
 	}
 	delete[] str;
@@ -665,15 +673,21 @@ int main (int argc, const char *argv[])
         //printf("0\n");
         if (result_file[METRIC_YUV_DIFF] != NULL) {
           // New: write difference YUV
-          bool mse_or_psnr = 1; // psnr
-          yuvDiff->calculate_and_map_differences(original_frame, processed_frame, y, u, v, mse_or_psnr);
+          int mse_or_psnr = 1; // psnr
+          yuvDiff->calculate_and_map_differences(original_frame, processed_frame, extra_frame, y, u, v, mse_or_psnr);
           yuvDiff->write_yuv(result_file[METRIC_YUV_DIFF], y, u, v);
         }
         if (result_file[METRIC_YUV_DIFF_MSE] != NULL) {
           // New: write difference YUV MSE
-          bool mse_or_psnr = 0; // mse
-          yuvDiff->calculate_and_map_differences(original_frame, processed_frame, y, u, v, mse_or_psnr);
+          int mse_or_psnr = 0; // mse
+          yuvDiff->calculate_and_map_differences(original_frame, processed_frame, extra_frame, y, u, v, mse_or_psnr);
           yuvDiff->write_yuv(result_file[METRIC_YUV_DIFF_MSE], y, u, v);
+        }
+        if (result_file[METRIC_YUV_DIFF_CORR_COEF] != NULL) {
+          // New: write difference YUV MSE
+          int mse_or_psnr = 2; // corr_coef
+          yuvDiff->calculate_and_map_differences(original_frame, processed_frame, extra_frame, y, u, v, mse_or_psnr);
+          yuvDiff->write_yuv(result_file[METRIC_YUV_DIFF_CORR_COEF], y, u, v);
         }
 
         if (result_file[METRIC_YUV_SUBTRACT_DIFF] != NULL) {
@@ -704,6 +718,27 @@ int main (int argc, const char *argv[])
 
           // Write resulting yuv file
           yuvDiff->write_yuv(result_file[METRIC_YUV_SUBTRACT_DIFF], y, u, v);
+        }
+
+        if (result_file[METRIC_YUV_CHANGE_U] != NULL) {
+
+          // Grab 8 bit y, u and v components
+          cv::Mat original_frame_y_8b(height, width, CV_8U);
+          original->getLuma(original_frame_y_8b, CV_8U);
+          cv::Mat original_frame_u(u_height, u_width, CV_8U);
+          original->getChroma0(original_frame_u, CV_8U);
+          cv::Mat original_frame_v(v_height, v_width, CV_8U);
+          original->getChroma1(original_frame_v, CV_8U);
+
+          cv::Mat new_frame_u(u_height, u_width, CV_8U);
+
+          int seed = white_x + frame;
+          float mean = 0.0;
+          float stdev = float(white_y);
+          yuvDiff->randomly_change(original_frame_u, seed, mean, stdev, new_frame_u);
+
+          // Write resulting yuv file
+          yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_U], original_frame_y_8b, new_frame_u, original_frame_v);
         }
 
 		// Print quality index to file
@@ -819,6 +854,9 @@ int main (int argc, const char *argv[])
     }
     if (result_file[METRIC_YUV_DIFF_MSE] != NULL) {
       fclose(result_file[METRIC_YUV_DIFF_MSE]);
+    }
+    if (result_file[METRIC_YUV_DIFF_CORR_COEF] != NULL) {
+      fclose(result_file[METRIC_YUV_DIFF_CORR_COEF]);
     }
 
     //if (result_file_yuv_diff) {
