@@ -190,6 +190,7 @@ enum Metrics {
     METRIC_YUV_DIFF_CORR_COEF,
     METRIC_YUV_SUBTRACT_DIFF,
     METRIC_YUV_CHANGE_U,
+    METRIC_YUV_CHANGE_V,
     METRIC_SIZE
 };
 
@@ -393,6 +394,9 @@ int main (int argc, const char *argv[])
         } else if (strcmp(argv[i], "YUV_CHANGE_U") == 0) {
           sprintf(str, "%s_change_u.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_CHANGE_U] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_CHANGE_V") == 0) {
+        sprintf(str, "%s_change_v.yuv", argv[PARAM_RESULTS]);
+        result_file[METRIC_YUV_CHANGE_V] = fopen(str, "wb");
         }
 	}
 	delete[] str;
@@ -720,7 +724,7 @@ int main (int argc, const char *argv[])
           yuvDiff->write_yuv(result_file[METRIC_YUV_SUBTRACT_DIFF], y, u, v);
         }
 
-        if (result_file[METRIC_YUV_CHANGE_U] != NULL) {
+        if (result_file[METRIC_YUV_CHANGE_U] != NULL || result_file[METRIC_YUV_CHANGE_V] != NULL) {
 
           // Grab 8 bit y, u and v components
           cv::Mat original_frame_y_8b(height, width, CV_8U);
@@ -730,15 +734,27 @@ int main (int argc, const char *argv[])
           cv::Mat original_frame_v(v_height, v_width, CV_8U);
           original->getChroma1(original_frame_v, CV_8U);
 
-          cv::Mat new_frame_u(u_height, u_width, CV_8U);
 
           int seed = white_x + frame;
           float mean = 0.0;
           float stdev = float(white_y);
-          yuvDiff->randomly_change(original_frame_u, seed, mean, stdev, new_frame_u);
 
-          // Write resulting yuv file
-          yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_U], original_frame_y_8b, new_frame_u, original_frame_v);
+          if (result_file[METRIC_YUV_CHANGE_U] != NULL) {
+            cv::Mat new_frame_u(u_height, u_width, CV_8U);
+            yuvDiff->randomly_change(original_frame_u, seed, mean, stdev, new_frame_u);
+
+            // Write resulting yuv file
+            yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_U], original_frame_y_8b, new_frame_u, original_frame_v);
+          }
+
+          if (result_file[METRIC_YUV_CHANGE_V] != NULL) {
+            cv::Mat new_frame_v(v_height, v_width, CV_8U);
+            yuvDiff->randomly_change(original_frame_v, seed, mean, stdev, new_frame_v);
+
+            // Write resulting yuv file
+            yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_V], original_frame_y_8b, original_frame_u, new_frame_v);
+          }
+
         }
 
 		// Print quality index to file
