@@ -234,6 +234,21 @@ void YUVDiff::randomly_change(const cv::Mat & original, int seed, float mean, fl
   }
 }
 
+void YUVDiff::change_fixed(const cv::Mat & original, int fixed_value, cv::Mat & new_fixed)
+{
+  // Could probably be done much more efficient than double loop
+
+  // First copy
+  original.copyTo(new_fixed);
+
+  // Set to fixed value
+  for (int i = 0; i < original.rows; i++) {
+    for (int j = 0; j < original.cols; j++) {
+      new_fixed.at<unsigned char>(i, j) = fixed_value;
+    }
+  }
+}
+
 void YUVDiff::write_yuv(FILE* file, const cv::Mat& diff_y, const cv::Mat& diff_u, const cv::Mat& diff_v) {
   write_mat(file, diff_y);
   write_mat(file, diff_u);

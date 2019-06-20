@@ -13,6 +13,7 @@ public:
   void calculate_and_subtract_differences(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& extra, cv::Mat& subtract_diff);
   
   void randomly_change(const cv::Mat & original, int seed, float mean, float stdev, cv::Mat & new_noised);
+  void change_fixed(const cv::Mat & original, int fixed_value, cv::Mat & new_fixed);
 
   void write_yuv(FILE* file, const cv::Mat& diff_y, const cv::Mat& diff_u, const cv::Mat& diff_v);
 protected:

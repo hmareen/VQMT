@@ -191,6 +191,10 @@ enum Metrics {
     METRIC_YUV_SUBTRACT_DIFF,
     METRIC_YUV_CHANGE_U,
     METRIC_YUV_CHANGE_V,
+    METRIC_YUV_FIXED_Y,
+    METRIC_YUV_ONLY_Y,
+    METRIC_YUV_ONLY_U,
+    METRIC_YUV_ONLY_V,
     METRIC_SIZE
 };
 
@@ -395,8 +399,20 @@ int main (int argc, const char *argv[])
           sprintf(str, "%s_change_u.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_CHANGE_U] = fopen(str, "wb");
         } else if (strcmp(argv[i], "YUV_CHANGE_V") == 0) {
-        sprintf(str, "%s_change_v.yuv", argv[PARAM_RESULTS]);
-        result_file[METRIC_YUV_CHANGE_V] = fopen(str, "wb");
+          sprintf(str, "%s_change_v.yuv", argv[PARAM_RESULTS]);
+          result_file[METRIC_YUV_CHANGE_V] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_FIXED_Y") == 0) {
+          sprintf(str, "%s_fixed_y_%d.yuv", argv[PARAM_RESULTS], white_x);
+          result_file[METRIC_YUV_FIXED_Y] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_ONLY_Y") == 0) {
+          sprintf(str, "%s_only_y_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
+          result_file[METRIC_YUV_ONLY_Y] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_ONLY_U") == 0) {
+        sprintf(str, "%s_only_u_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
+        result_file[METRIC_YUV_ONLY_U] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_ONLY_V") == 0) {
+        sprintf(str, "%s_only_v_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
+        result_file[METRIC_YUV_ONLY_V] = fopen(str, "wb");
         }
 	}
 	delete[] str;
@@ -754,7 +770,67 @@ int main (int argc, const char *argv[])
             // Write resulting yuv file
             yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_V], original_frame_y_8b, original_frame_u, new_frame_v);
           }
+        }
 
+        if (result_file[METRIC_YUV_FIXED_Y] != NULL) {
+          cv::Mat original_frame_y_8b(height, width, CV_8U);
+          original->getLuma(original_frame_y_8b, CV_8U);
+          cv::Mat original_frame_u(u_height, u_width, CV_8U);
+          original->getChroma0(original_frame_u, CV_8U);
+          cv::Mat original_frame_v(v_height, v_width, CV_8U);
+          original->getChroma1(original_frame_v, CV_8U);
+
+          int fixed_value = white_x;
+
+          //cv::Mat new_frame_y(height, width, CV_8U);
+          //yuvDiff->change_fixed(original_frame_y_8b, fixed_value, new_frame_y);
+
+          original_frame_y_8b.setTo(cv::Scalar(fixed_value));
+          //printf("Change to %d \n", fixed_value);
+
+          // Write resulting yuv file
+          yuvDiff->write_yuv(result_file[METRIC_YUV_FIXED_Y], original_frame_y_8b, original_frame_u, original_frame_v);
+        }
+
+        if (result_file[METRIC_YUV_ONLY_Y] != NULL || result_file[METRIC_YUV_ONLY_U] != NULL || result_file[METRIC_YUV_ONLY_V] != NULL) {
+          cv::Mat original_frame_y_8b(height, width, CV_8U);
+          original->getLuma(original_frame_y_8b, CV_8U);
+          cv::Mat original_frame_u(u_height, u_width, CV_8U);
+          original->getChroma0(original_frame_u, CV_8U);
+          cv::Mat original_frame_v(v_height, v_width, CV_8U);
+          original->getChroma1(original_frame_v, CV_8U);
+
+          int fixed_value_other_1 = white_x;
+          int fixed_value_other_2 = white_y;
+
+          if (result_file[METRIC_YUV_ONLY_Y] != NULL) {
+            cv::Mat new_frame_u(u_height, u_width, CV_8U);
+            cv::Mat new_frame_v(v_height, v_width, CV_8U);
+
+            new_frame_u.setTo(cv::Scalar(fixed_value_other_1));
+            new_frame_v.setTo(cv::Scalar(fixed_value_other_2));
+
+            yuvDiff->write_yuv(result_file[METRIC_YUV_ONLY_Y], original_frame_y_8b, new_frame_u, new_frame_v);
+          }
+
+          if (result_file[METRIC_YUV_ONLY_U] != NULL) {
+            cv::Mat new_frame_y(height, width, CV_8U);
+            cv::Mat new_frame_v(v_height, v_width, CV_8U);
+
+            new_frame_y.setTo(cv::Scalar(fixed_value_other_1));
+            new_frame_v.setTo(cv::Scalar(fixed_value_other_2));
+
+            yuvDiff->write_yuv(result_file[METRIC_YUV_ONLY_U], new_frame_y, original_frame_u, new_frame_v);
+          }
+
+          if (result_file[METRIC_YUV_ONLY_V] != NULL) {
+            cv::Mat new_frame_y(height, width, CV_8U);
+            cv::Mat new_frame_u(u_height, u_width, CV_8U);
+            new_frame_y.setTo(cv::Scalar(fixed_value_other_1));
+            new_frame_u.setTo(cv::Scalar(fixed_value_other_2));
+
+            yuvDiff->write_yuv(result_file[METRIC_YUV_ONLY_V], new_frame_y, new_frame_u, original_frame_v);
+          }
         }
 
 		// Print quality index to file
