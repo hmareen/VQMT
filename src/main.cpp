@@ -160,6 +160,7 @@ enum Params {
 enum Metrics {
     METRIC_PSNR = 0,
 	METRIC_ABS_ERR,
+  METRIC_MEAN_ABS_ERR,
   METRIC_ABS_ERR_WHITE,
     METRIC_SSIM,
     METRIC_MSSSIM,
@@ -181,20 +182,34 @@ enum Metrics {
     METRIC_CORRELATION_COEF_NO_SUB_LOWPASS_BLOCKS,
     METRIC_CORRELATION_COEF_BINARIZED,
     METRIC_CORRELATION_COEF_NO_SUB_BINARIZED,
+    METRIC_EUCL_DIST_SQ,
+    METRIC_EUCL_DIST_SQ_NO_SUB,
     METRIC_SIZE_1_VALUE,
     METRIC_HIST,
     METRIC_HIST_DIFF,
     METRIC_SSIM_HIST_DIFF,
+    METRIC_SIZE_YUV_BEGIN,
     METRIC_YUV_DIFF,
+    METRIC_YUV_DIFF_U,
+    METRIC_YUV_DIFF_V,
     METRIC_YUV_DIFF_MSE,
     METRIC_YUV_DIFF_CORR_COEF,
     METRIC_YUV_SUBTRACT_DIFF,
+    METRIC_YUV_CHANGE,
+    METRIC_YUV_CHANGE_Y,
     METRIC_YUV_CHANGE_U,
     METRIC_YUV_CHANGE_V,
+    METRIC_YUV_CHANGE_NS,
+    METRIC_YUV_CHANGE_NS_Y,
+    METRIC_YUV_CHANGE_NS_U,
+    METRIC_YUV_CHANGE_NS_V,
     METRIC_YUV_FIXED_Y,
     METRIC_YUV_ONLY_Y,
     METRIC_YUV_ONLY_U,
     METRIC_YUV_ONLY_V,
+    METRIC_YUV_U2Y,
+    METRIC_YUV_V2Y,
+    METRIC_YUV_AVG,
     METRIC_SIZE
 };
 
@@ -262,20 +277,22 @@ int main (int argc, const char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	// Input video streams
-	VideoYUV *original  = new VideoYUV(argv[PARAM_ORIGINAL], height, width, nbframes, chroma);
-	VideoYUV *processed = new VideoYUV(argv[PARAM_PROCESSED], height, width, nbframes, chroma);
+  // Input video streams
+  VideoYUV *original = new VideoYUV(argv[PARAM_ORIGINAL], height, width, nbframes, chroma);
+  VideoYUV *processed = new VideoYUV(argv[PARAM_PROCESSED], height, width, nbframes, chroma);
 
-    VideoYUV *extra;
-    if(strlen(argv[PARAM_EXTRA]) > 1) {
-        extra = new VideoYUV(argv[PARAM_EXTRA], height, width, nbframes, chroma);
-    }
+  VideoYUV *extra;
+  if (strlen(argv[PARAM_EXTRA]) > 1) {
+    extra = new VideoYUV(argv[PARAM_EXTRA], height, width, nbframes, chroma);
+  }
 
 	// Output files for results
 	FILE *result_file[METRIC_SIZE] = {NULL};
     FILE *result_file_hist_psnr[HISTS_SIZE] = { NULL };
     FILE *result_file_hist_ssim[HISTS_SIZE] = { NULL };
-    int result_file_yuv_diff;
+
+    bool is_create_average = false;
+
 	char *str = new char[256];
 	for (int i=7; i<argc; i++) {
 		if (strcmp(argv[i], "PSNR") == 0) {
@@ -286,6 +303,10 @@ int main (int argc, const char *argv[])
 			sprintf(str, "%s_abs_err.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_ABS_ERR] = fopen(str, "w");
 		}
+    else if (strcmp(argv[i], "MEAN_ABS_ERR") == 0) {
+      sprintf(str, "%s_mae.csv", argv[PARAM_RESULTS]);
+      result_file[METRIC_MEAN_ABS_ERR] = fopen(str, "w");
+    }
     else if (strcmp(argv[i], "ABS_ERR_WHITE") == 0) {
       sprintf(str, "%s_abs_err_white.csv", argv[PARAM_RESULTS]);
       result_file[METRIC_ABS_ERR_WHITE] = fopen(str, "w");
@@ -380,27 +401,64 @@ int main (int argc, const char *argv[])
         } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB_BINARIZED") == 0) {
           sprintf(str, "%s_corr_coef_no_sub_binarized.csv", argv[PARAM_RESULTS]);
           result_file[METRIC_CORRELATION_COEF_NO_SUB_BINARIZED] = fopen(str, "w");
-        } else if (strcmp(argv[i], "CORRELATION_COEF_BINARIZED") == 0) {
-          sprintf(str, "%s_corr_coef_binarized.csv", argv[PARAM_RESULTS]);
-          result_file[METRIC_CORRELATION_COEF_BINARIZED] = fopen(str, "w");
+        } else if (strcmp(argv[i], "EUCL_DIST_SQ") == 0) {
+          sprintf(str, "%s_eucl_dist_sq.csv", argv[PARAM_RESULTS]);
+          result_file[METRIC_EUCL_DIST_SQ] = fopen(str, "w");
+        } else if (strcmp(argv[i], "EUCL_DIST_SQ_NO_SUB") == 0) {
+        sprintf(str, "%s_eucl_dist_sq_no_sub.csv", argv[PARAM_RESULTS]);
+        result_file[METRIC_EUCL_DIST_SQ_NO_SUB] = fopen(str, "w");
+        } else if (strcmp(argv[i], "CORRELATION_COEF_NO_SUB") == 0) {
+        sprintf(str, "%s_corr_coef_no_sub.csv", argv[PARAM_RESULTS]);
+        result_file[METRIC_CORRELATION_COEF_NO_SUB] = fopen(str, "w");
         } else if (strcmp(argv[i], "YUV_DIFF") == 0) {
           sprintf(str, "%s_diff.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_DIFF] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_DIFF_U") == 0) {
+          sprintf(str, "%s_diff_u.yuv", argv[PARAM_RESULTS]);
+          result_file[METRIC_YUV_DIFF_U] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_DIFF_V") == 0) {
+          sprintf(str, "%s_diff_v.yuv", argv[PARAM_RESULTS]);
+          result_file[METRIC_YUV_DIFF_V] = fopen(str, "wb");
         } else if (strcmp(argv[i], "YUV_DIFF_MSE") == 0) {
           sprintf(str, "%s_diff_mse.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_DIFF_MSE] = fopen(str, "wb");
         } else if (strcmp(argv[i], "YUV_DIFF_CORR_COEF") == 0) {
           sprintf(str, "%s_diff_corr_coef.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_DIFF_CORR_COEF] = fopen(str, "wb");
-        } else if (strcmp(argv[i], "YUV_SUBTRACT_DIFF") == 0) {
+        }
+        else if (strcmp(argv[i], "YUV_SUBTRACT_DIFF") == 0) {
           sprintf(str, "%s_subtract_diff.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_SUBTRACT_DIFF] = fopen(str, "wb");
+        }
+        else if (strcmp(argv[i], "YUV_CHANGE") == 0) {
+          sprintf(str, "%s_change_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
+          result_file[METRIC_YUV_CHANGE] = fopen(str, "wb");
+        }
+        else if (strcmp(argv[i], "YUV_CHANGE_Y") == 0) {
+        sprintf(str, "%s_change_y_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
+        result_file[METRIC_YUV_CHANGE_Y] = fopen(str, "wb");
         } else if (strcmp(argv[i], "YUV_CHANGE_U") == 0) {
-          sprintf(str, "%s_change_u.yuv", argv[PARAM_RESULTS]);
+          sprintf(str, "%s_change_u_%d_%d.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_CHANGE_U] = fopen(str, "wb");
         } else if (strcmp(argv[i], "YUV_CHANGE_V") == 0) {
-          sprintf(str, "%s_change_v.yuv", argv[PARAM_RESULTS]);
+          sprintf(str, "%s_change_v_%d_%d.yuv", argv[PARAM_RESULTS]);
           result_file[METRIC_YUV_CHANGE_V] = fopen(str, "wb");
+        }
+        else if (strcmp(argv[i], "YUV_CHANGE_NS") == 0) {
+        sprintf(str, "%s_change_ns_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
+        result_file[METRIC_YUV_CHANGE_NS] = fopen(str, "wb");
+        }
+        else if (strcmp(argv[i], "YUV_CHANGE_NS_Y") == 0) {
+        sprintf(str, "%s_change_ns_y_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
+        result_file[METRIC_YUV_CHANGE_NS_Y] = fopen(str, "wb");
+        }
+        else if (strcmp(argv[i], "YUV_CHANGE_NS_U") == 0) {
+        sprintf(str, "%s_change_ns_u_%d_%d.yuv", argv[PARAM_RESULTS]);
+        result_file[METRIC_YUV_CHANGE_NS_U] = fopen(str, "wb");
+        }
+        else if (strcmp(argv[i], "YUV_CHANGE_NS_V") == 0) {
+        sprintf(str, "%s_change_ns_v_%d_%d.yuv", argv[PARAM_RESULTS]);
+        result_file[METRIC_YUV_CHANGE_NS_V] = fopen(str, "wb");
         } else if (strcmp(argv[i], "YUV_FIXED_Y") == 0) {
           sprintf(str, "%s_fixed_y_%d.yuv", argv[PARAM_RESULTS], white_x);
           result_file[METRIC_YUV_FIXED_Y] = fopen(str, "wb");
@@ -413,9 +471,39 @@ int main (int argc, const char *argv[])
         } else if (strcmp(argv[i], "YUV_ONLY_V") == 0) {
         sprintf(str, "%s_only_v_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
         result_file[METRIC_YUV_ONLY_V] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_U2Y") == 0) {
+        sprintf(str, "%s_u2y_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
+        result_file[METRIC_YUV_U2Y] = fopen(str, "wb");
+        } else if (strcmp(argv[i], "YUV_V2Y") == 0) {
+        sprintf(str, "%s_v2y_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
+        result_file[METRIC_YUV_V2Y] = fopen(str, "wb");
+        }
+        else if (strcmp(argv[i], "YUV_AVG") == 0) {
+        is_create_average = true;
+        sprintf(str, "%s_avg_%d_%d.yuv", argv[PARAM_RESULTS], white_x, white_y);
+        result_file[METRIC_YUV_AVG] = fopen(str, "wb");
         }
 	}
 	delete[] str;
+
+
+  std::vector<VideoYUV*> videosToAverage;
+  //std::vector<cv::Mat> videosToAverageFrames;
+  //std::vector<cv::Mat> videosToAverageFramesU;
+  //std::vector<cv::Mat> videosToAverageFramesV;
+  
+  int nr_video_to_average_begin = white_x;
+  int nr_video_to_average_end = white_y;
+  int nr_of_videos_to_average = nr_video_to_average_end - nr_video_to_average_begin + 1;
+
+  if (is_create_average) {
+    for (int i = nr_video_to_average_begin; i <= nr_video_to_average_end; i++) {
+      std::string videoToAverageName = std::string(argv[PARAM_ORIGINAL]) + std::to_string(i) + std::string(argv[PARAM_PROCESSED]);
+      //std::cout << videoToAverageName << "\n";
+      videosToAverage.push_back(new VideoYUV(videoToAverageName.c_str(), height, width, nbframes, chroma));
+      //videosToAverageFrames.push_back(cv::Mat(height, width, CV_16U));
+    }
+  }
 
 	// Check size for VIFp downsampling
 	if (result_file[METRIC_VIFP] != NULL && (height % 8 != 0 || width % 8 != 0)) {
@@ -486,6 +574,7 @@ int main (int argc, const char *argv[])
     int u_width = original->comp_width[1];
     int v_height = original->comp_height[2];
     int v_width = original->comp_width[2];
+    YUVDiff *yuvDiff_uv = new YUVDiff(u_height, u_width);
 
     // CHROMA
     CORRELATION *correlation_chroma_u = new CORRELATION(u_height, u_width);
@@ -528,25 +617,27 @@ int main (int argc, const char *argv[])
 	for (int frame=0; frame<nbframes; frame++) {
     //printf("Frame %d\n", frame);
 		// Grab frame
-		if (!original->readOneFrame()) exit(EXIT_FAILURE);
-		original->getLuma(original_frame, CV_32F);
-		if (!processed->readOneFrame()) exit(EXIT_FAILURE);
-		processed->getLuma(processed_frame, CV_32F);
-    if(strlen(argv[PARAM_EXTRA]) > 1) {
-        if(!extra->readOneFrame()) exit(EXIT_FAILURE);
+    if (!is_create_average) {
+      if (!original->readOneFrame()) exit(EXIT_FAILURE);
+      original->getLuma(original_frame, CV_32F);
+      if (!processed->readOneFrame()) exit(EXIT_FAILURE);
+      processed->getLuma(processed_frame, CV_32F);
+      if (strlen(argv[PARAM_EXTRA]) > 1) {
+        if (!extra->readOneFrame()) exit(EXIT_FAILURE);
         extra->getLuma(extra_frame, CV_32F);
-    }
-
-    if (with_chroma) {
-      original->getChroma0(original_frame_chroma_u, CV_32F);
-      processed->getChroma0(processed_frame_chroma_u, CV_32F);
-      if (strlen(argv[PARAM_EXTRA]) > 1) {
-        extra->getChroma0(extra_frame_chroma_u, CV_32F);
       }
-      original->getChroma1(original_frame_chroma_v, CV_32F);
-      processed->getChroma1(processed_frame_chroma_v, CV_32F);
-      if (strlen(argv[PARAM_EXTRA]) > 1) {
-        extra->getChroma1(extra_frame_chroma_v, CV_32F);
+
+      if (with_chroma) {
+        original->getChroma0(original_frame_chroma_u, CV_32F);
+        processed->getChroma0(processed_frame_chroma_u, CV_32F);
+        if (strlen(argv[PARAM_EXTRA]) > 1) {
+          extra->getChroma0(extra_frame_chroma_u, CV_32F);
+        }
+        original->getChroma1(original_frame_chroma_v, CV_32F);
+        processed->getChroma1(processed_frame_chroma_v, CV_32F);
+        if (strlen(argv[PARAM_EXTRA]) > 1) {
+          extra->getChroma1(extra_frame_chroma_v, CV_32F);
+        }
       }
     }
 
@@ -558,6 +649,9 @@ int main (int argc, const char *argv[])
 		if (result_file[METRIC_ABS_ERR] != NULL) {
 			result[METRIC_ABS_ERR] = psnr->compute_abs_error(original_frame, processed_frame);
 		}
+    if (result_file[METRIC_MEAN_ABS_ERR] != NULL) {
+      result[METRIC_MEAN_ABS_ERR] = psnr->compute_abs_error(original_frame, processed_frame) / (height * width);
+    }
 
     if (result_file[METRIC_ABS_ERR_WHITE] != NULL) {
       result[METRIC_ABS_ERR_WHITE] = psnr->compute_abs_error(original_frame, processed_frame, white_x, white_y, white_width, white_height);
@@ -689,6 +783,14 @@ int main (int argc, const char *argv[])
           result[METRIC_CORRELATION_COEF_BINARIZED] = correlation->compute_correlation_coefficient_subtract_binarized(original_frame, processed_frame, extra_frame, factor_threshold_std);
         }
 
+        if (result_file[METRIC_EUCL_DIST_SQ] != NULL) {
+          result[METRIC_EUCL_DIST_SQ] = correlation->compute_eucl_dist_sq_subtract(original_frame, processed_frame, extra_frame);
+        }
+
+        if (result_file[METRIC_EUCL_DIST_SQ_NO_SUB] != NULL) {
+          result[METRIC_EUCL_DIST_SQ_NO_SUB] = correlation->compute_eucl_dist_sq(original_frame, processed_frame);
+        }
+
 
         //printf("0\n");
         if (result_file[METRIC_YUV_DIFF] != NULL) {
@@ -697,6 +799,33 @@ int main (int argc, const char *argv[])
           yuvDiff->calculate_and_map_differences(original_frame, processed_frame, extra_frame, y, u, v, mse_or_psnr);
           yuvDiff->write_yuv(result_file[METRIC_YUV_DIFF], y, u, v);
         }
+
+        if (result_file[METRIC_YUV_DIFF_U] != NULL || result_file[METRIC_YUV_DIFF_V] != NULL) {
+          // New: write difference YUV
+          int mse_or_psnr = 1; // psnr
+          cv::Mat original_frame_u(u_height, u_width, CV_32F), processed_frame_u(u_height, u_width, CV_32F), extra_frame_u(u_height, u_width, CV_32F);
+          cv::Mat y_small(u_height, u_width, CV_32F);
+          cv::Mat u_small(u_height/2, u_width/2, CV_32F), v_small(v_height/2, v_width/2, CV_32F);
+
+          if (result_file[METRIC_YUV_DIFF_U] != NULL) {
+            original->getChroma0(original_frame_u, CV_32F);
+            processed->getChroma0(processed_frame_u, CV_32F);
+            extra->getChroma0(extra_frame_u, CV_32F);
+
+            yuvDiff_uv->calculate_and_map_differences(original_frame_u, processed_frame_u, extra_frame_u, y_small, u_small, v_small, mse_or_psnr);
+            yuvDiff_uv->write_yuv(result_file[METRIC_YUV_DIFF_U], y_small, u_small, v_small);
+          }
+          if (result_file[METRIC_YUV_DIFF_V] != NULL) {
+            original->getChroma1(original_frame_u, CV_32F);
+            processed->getChroma1(processed_frame_u, CV_32F);
+            extra->getChroma1(extra_frame_u, CV_32F);
+
+            yuvDiff_uv->calculate_and_map_differences(original_frame_u, processed_frame_u, extra_frame_u, y_small, u_small, v_small, mse_or_psnr);
+            yuvDiff_uv->write_yuv(result_file[METRIC_YUV_DIFF_V], y_small, u_small, v_small);
+          }
+        }
+
+
         if (result_file[METRIC_YUV_DIFF_MSE] != NULL) {
           // New: write difference YUV MSE
           int mse_or_psnr = 0; // mse
@@ -740,7 +869,8 @@ int main (int argc, const char *argv[])
           yuvDiff->write_yuv(result_file[METRIC_YUV_SUBTRACT_DIFF], y, u, v);
         }
 
-        if (result_file[METRIC_YUV_CHANGE_U] != NULL || result_file[METRIC_YUV_CHANGE_V] != NULL) {
+        if (result_file[METRIC_YUV_CHANGE] != NULL || result_file[METRIC_YUV_CHANGE_Y] != NULL ||  result_file[METRIC_YUV_CHANGE_U] != NULL || result_file[METRIC_YUV_CHANGE_V] != NULL || 
+          result_file[METRIC_YUV_CHANGE_NS] != NULL || result_file[METRIC_YUV_CHANGE_NS_Y] != NULL || result_file[METRIC_YUV_CHANGE_NS_U] != NULL || result_file[METRIC_YUV_CHANGE_NS_V] != NULL) {
 
           // Grab 8 bit y, u and v components
           cv::Mat original_frame_y_8b(height, width, CV_8U);
@@ -750,10 +880,32 @@ int main (int argc, const char *argv[])
           cv::Mat original_frame_v(v_height, v_width, CV_8U);
           original->getChroma1(original_frame_v, CV_8U);
 
-
-          int seed = white_x + frame;
+          // Different noise for every frame
+          //int seed = white_x + frame;
+          // Same noise for every frame
+          int seed = white_x ;
           float mean = 0.0;
           float stdev = float(white_y);
+
+          if (result_file[METRIC_YUV_CHANGE] != NULL) {
+            cv::Mat new_frame_y(height, width, CV_8U);
+            yuvDiff->randomly_change(original_frame_y_8b, seed, mean, stdev, new_frame_y);
+            cv::Mat new_frame_u(u_height, u_width, CV_8U);
+            yuvDiff->randomly_change(original_frame_u, seed+42, mean, stdev, new_frame_u);
+            cv::Mat new_frame_v(v_height, v_width, CV_8U);
+            yuvDiff->randomly_change(original_frame_v, seed-42, mean, stdev, new_frame_v);
+
+            // Write resulting yuv file
+            yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE], new_frame_y, new_frame_u, new_frame_v);
+          }
+
+          if (result_file[METRIC_YUV_CHANGE_Y] != NULL) {
+            cv::Mat new_frame_y(height, width, CV_8U);
+            yuvDiff->randomly_change(original_frame_y_8b, seed, mean, stdev, new_frame_y);
+
+            // Write resulting yuv file
+            yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_Y], new_frame_y, original_frame_u, original_frame_v);
+          }
 
           if (result_file[METRIC_YUV_CHANGE_U] != NULL) {
             cv::Mat new_frame_u(u_height, u_width, CV_8U);
@@ -769,6 +921,42 @@ int main (int argc, const char *argv[])
 
             // Write resulting yuv file
             yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_V], original_frame_y_8b, original_frame_u, new_frame_v);
+          }
+
+          if (result_file[METRIC_YUV_CHANGE_NS] != NULL) {
+            cv::Mat new_frame_y(height, width, CV_8U);
+            yuvDiff->randomly_change_non_stationary(original_frame_y_8b, seed, mean, stdev, new_frame_y);
+            cv::Mat new_frame_u(u_height, u_width, CV_8U);
+            yuvDiff->randomly_change_non_stationary(original_frame_u, seed+42, mean, stdev, new_frame_u);
+            cv::Mat new_frame_v(v_height, v_width, CV_8U);
+            yuvDiff->randomly_change_non_stationary(original_frame_v, seed-42, mean, stdev, new_frame_v);
+
+            // Write resulting yuv file
+            yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_NS], new_frame_y, new_frame_u, new_frame_v);
+          }
+
+          if (result_file[METRIC_YUV_CHANGE_NS_Y] != NULL) {
+            cv::Mat new_frame_y(height, width, CV_8U);
+            yuvDiff->randomly_change_non_stationary(original_frame_y_8b, seed, mean, stdev, new_frame_y);
+
+            // Write resulting yuv file
+            yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_NS_Y], new_frame_y, original_frame_u, original_frame_v);
+          }
+
+          if (result_file[METRIC_YUV_CHANGE_NS_U] != NULL) {
+            cv::Mat new_frame_u(u_height, u_width, CV_8U);
+            yuvDiff->randomly_change_non_stationary(original_frame_u, seed, mean, stdev, new_frame_u);
+
+            // Write resulting yuv file
+            yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_NS_U], original_frame_y_8b, new_frame_u, original_frame_v);
+          }
+
+          if (result_file[METRIC_YUV_CHANGE_NS_V] != NULL) {
+            cv::Mat new_frame_v(v_height, v_width, CV_8U);
+            yuvDiff->randomly_change_non_stationary(original_frame_v, seed, mean, stdev, new_frame_v);
+
+            // Write resulting yuv file
+            yuvDiff->write_yuv(result_file[METRIC_YUV_CHANGE_NS_V], original_frame_y_8b, original_frame_u, new_frame_v);
           }
         }
 
@@ -792,7 +980,7 @@ int main (int argc, const char *argv[])
           yuvDiff->write_yuv(result_file[METRIC_YUV_FIXED_Y], original_frame_y_8b, original_frame_u, original_frame_v);
         }
 
-        if (result_file[METRIC_YUV_ONLY_Y] != NULL || result_file[METRIC_YUV_ONLY_U] != NULL || result_file[METRIC_YUV_ONLY_V] != NULL) {
+        if (result_file[METRIC_YUV_ONLY_Y] != NULL || result_file[METRIC_YUV_ONLY_U] != NULL || result_file[METRIC_YUV_ONLY_V] != NULL || result_file[METRIC_YUV_U2Y] != NULL || result_file[METRIC_YUV_V2Y] != NULL) {
           cv::Mat original_frame_y_8b(height, width, CV_8U);
           original->getLuma(original_frame_y_8b, CV_8U);
           cv::Mat original_frame_u(u_height, u_width, CV_8U);
@@ -831,8 +1019,57 @@ int main (int argc, const char *argv[])
 
             yuvDiff->write_yuv(result_file[METRIC_YUV_ONLY_V], new_frame_y, new_frame_u, original_frame_v);
           }
+
+          if (result_file[METRIC_YUV_U2Y] != NULL || result_file[METRIC_YUV_V2Y] != NULL) {
+            //cv::Mat new_frame_y(u_height, u_height, CV_8U);
+            cv::Mat new_frame_u(u_height/2, u_width/2, CV_8U);
+            cv::Mat new_frame_v(v_height/2, v_width/2, CV_8U);
+
+            new_frame_u.setTo(cv::Scalar(fixed_value_other_1));
+            new_frame_v.setTo(cv::Scalar(fixed_value_other_2));
+
+            if (result_file[METRIC_YUV_U2Y] != NULL) {
+              //cv::resize(original_frame_u, new_frame_y, new_frame_y.size());
+              yuvDiff->write_yuv(result_file[METRIC_YUV_U2Y], original_frame_u, new_frame_u, new_frame_v);
+            }
+            if (result_file[METRIC_YUV_V2Y] != NULL) {
+              //cv::resize(original_frame_v, new_frame_y, new_frame_y.size());
+              yuvDiff->write_yuv(result_file[METRIC_YUV_V2Y], original_frame_v, new_frame_u, new_frame_v);
+            }
+          }
+
         }
 
+        if (result_file[METRIC_YUV_AVG]) { // if(is_create_average)
+           // reset original_frame
+          original_frame = cv::Mat(height, width, CV_16U);
+          original_frame_chroma_u = cv::Mat(u_height, u_width, CV_32F);
+          original_frame_chroma_v = cv::Mat(v_height, v_width, CV_32F);
+          for (int i = 0; i < nr_of_videos_to_average; i++) {
+            if (!videosToAverage.at(i)->readOneFrame()) exit(EXIT_FAILURE);
+            videosToAverage.at(i)->getLuma(processed_frame, CV_16U);
+            yuvDiff->add_to_average_video(original_frame, processed_frame);
+
+            videosToAverage.at(i)->getChroma0(processed_frame_chroma_u, CV_32F);
+            yuvDiff->add_to_average_video(original_frame_chroma_u, processed_frame_chroma_u);
+
+            videosToAverage.at(i)->getChroma1(processed_frame_chroma_v, CV_32F);
+            yuvDiff->add_to_average_video(original_frame_chroma_v, processed_frame_chroma_v);
+
+            //std::cout << "Average added " << frame << " \n";
+          }
+
+          yuvDiff->finish_average_video(original_frame, nr_of_videos_to_average);
+          yuvDiff->finish_average_video(original_frame_chroma_u, nr_of_videos_to_average);
+          yuvDiff->finish_average_video(original_frame_chroma_v, nr_of_videos_to_average);
+
+          original_frame.convertTo(original_frame, CV_8U);
+          original_frame_chroma_u.convertTo(original_frame_chroma_u, CV_8U);
+          original_frame_chroma_v.convertTo(original_frame_chroma_v, CV_8U);
+
+          // For now: get u and v from first video
+          yuvDiff->write_yuv(result_file[METRIC_YUV_AVG], original_frame, original_frame_chroma_u, original_frame_chroma_v);
+        }
 		// Print quality index to file
         for(int m = 0; m<METRIC_SIZE_1_VALUE; m++) {
 			if (result_file[m] != NULL) {
@@ -900,6 +1137,7 @@ int main (int argc, const char *argv[])
 		}
 	}
 
+
     // Extra: print max of quality histograms
     if(result_file[METRIC_HIST] != NULL) {
         fprintf(result_file[METRIC_HIST], "max");
@@ -941,21 +1179,12 @@ int main (int argc, const char *argv[])
         }
     }
 
-    if (result_file[METRIC_YUV_DIFF] != NULL) {
-      fclose(result_file[METRIC_YUV_DIFF]);
-    }
-    if (result_file[METRIC_YUV_DIFF_MSE] != NULL) {
-      fclose(result_file[METRIC_YUV_DIFF_MSE]);
-    }
-    if (result_file[METRIC_YUV_DIFF_CORR_COEF] != NULL) {
-      fclose(result_file[METRIC_YUV_DIFF_CORR_COEF]);
+    for (int m = METRIC_SIZE_YUV_BEGIN + 1; m < METRIC_SIZE_1_VALUE; m++) {
+      if (result_file[m] != NULL) {
+        fclose(result_file[m]);
+      }
     }
 
-    //if (result_file_yuv_diff) {
-    //  printf("close\n");
-    //  close(result_file_yuv_diff);
-   //}
-    
     // Delete created pointers
     for(int i = 0; i < HISTS_SIZE; i++) {
         delete[] histSubBuffers[i];
@@ -964,19 +1193,29 @@ int main (int argc, const char *argv[])
         delete[] maxHistSSIMSubBuffers[i];
     }
 
+    if (is_create_average) {
+      for (int i = nr_video_to_average_begin; i <= nr_video_to_average_end; i++) {
+        //delete videosToAverage.at(i);
+      }
+    }
+    else {
+      delete original;
+      delete processed;
+    }
+
 	delete psnr;
 	delete ssim;
 	delete msssim;
 	delete vifp;
 	delete phvs;
-	delete original;
-	delete processed;
+
   delete correlation;
   delete yuvDiff;
 
+
 	duration = static_cast<double>(cv::getTickCount())-duration;
 	duration /= cv::getTickFrequency();
-	//printf("Time: %0.3fs\n", duration);
+	printf("Time: %0.3fs\n", duration);
 
 	return EXIT_SUCCESS;
 }

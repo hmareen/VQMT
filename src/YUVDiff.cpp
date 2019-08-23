@@ -6,6 +6,8 @@
 
 #include <stdlib.h> # rand
 #include <random>
+#include <vector>
+#include <algorithm>
 
 YUVDiff::YUVDiff(int h, int w)
 {
@@ -217,6 +219,48 @@ void YUVDiff::calculate_and_subtract_differences(const cv::Mat& original, const 
   cv::add(extra, tmp, subtract_diff, cv::noArray(), CV_8U);
 }
 
+void YUVDiff::randomly_change_non_stationary(const cv::Mat & original, int seed, float mean, float stdev, cv::Mat & new_noised)
+{
+  // First copy
+  original.copyTo(new_noised);
+
+  // Add random noise
+  // srand(seed);
+
+  stdev /= std::max(original.rows, original.cols);
+  stdev *= 1.4;
+  std::mt19937 de(seed);
+  std::normal_distribution<float> nd(mean, stdev);
+
+  std::vector<float> xdiff;
+  std::vector<float> ydiff;
+  xdiff.push_back(-50.0f);
+  ydiff.push_back(42.0f);
+  for (int i = 0; i < original.rows; i++) {
+    ydiff.push_back(nd(de) + ydiff.back());
+  }
+  for (int j = 0; j < original.cols; j++) {
+    xdiff.push_back(nd(de) + xdiff.back());
+  }
+
+  for (int i = 0; i < original.rows; i++) {
+    for (int j = 0; j < original.cols; j++) {
+      // Add noise, but clip
+      new_noised.at<unsigned char>(i, j) = std::max(
+        0, std::min(new_noised.at<unsigned char>(i, j) + int(xdiff[j] + ydiff[i]), 255));
+    }
+  }
+
+  //for (int i = 0; i < original.rows; i++) {
+  //  for (int j = 0; j < original.cols; j++) {
+  //    // Add noise, but clip
+  //    new_noised.at<unsigned char>(i, j) = std::max(
+  //      0, std::min(new_noised.at<unsigned char>(i, j) + int(nd(de)), 255));
+  //  }
+  //}
+
+}
+
 void YUVDiff::randomly_change(const cv::Mat & original, int seed, float mean, float stdev, cv::Mat & new_noised)
 {
   // First copy
@@ -247,6 +291,15 @@ void YUVDiff::change_fixed(const cv::Mat & original, int fixed_value, cv::Mat & 
       new_fixed.at<unsigned char>(i, j) = fixed_value;
     }
   }
+}
+
+
+void YUVDiff::add_to_average_video(const cv::Mat& average_video_processed, const cv::Mat& video_to_add) {
+  cv::add(average_video_processed, video_to_add, average_video_processed);
+}
+
+void YUVDiff::finish_average_video(const cv::Mat& average_video_processed, int nr_of_videos_added) {
+  cv::divide(average_video_processed, nr_of_videos_added, average_video_processed);
 }
 
 void YUVDiff::write_yuv(FILE* file, const cv::Mat& diff_y, const cv::Mat& diff_u, const cv::Mat& diff_v) {

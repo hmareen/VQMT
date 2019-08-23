@@ -50,6 +50,38 @@ float CORRELATION::compute_correlation_coefficient(const cv::Mat& original, cons
   return cv::sum(original_tmp).val[0];
 }
 
+float CORRELATION::compute_eucl_dist_sq(const cv::Mat& original, const cv::Mat& processed) {
+  return compute_eucl_dist_sq(original, processed, height, width);
+}
+
+float CORRELATION::compute_eucl_dist_sq(const cv::Mat& original, const cv::Mat& processed, int h, int w) {
+  cv::Mat original_tmp(h, w, CV_32F);
+
+  // Subtract
+  cv::subtract(original, processed, original_tmp);
+
+  // Square
+  cv::multiply(original_tmp, original_tmp, original_tmp);
+
+  return cv::sum(original_tmp).val[0];
+}
+
+float CORRELATION::compute_eucl_dist_sq_subtract(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& subtract) {
+  cv::Mat original_tmp(height, width, CV_32F);
+  cv::Mat processed_tmp(height, width, CV_32F);
+
+  // Subtract
+  cv::subtract(original, subtract, original_tmp);
+  cv::subtract(processed, subtract, processed_tmp);
+
+  cv::subtract(original, processed, original_tmp);
+
+  // Square
+  cv::multiply(original_tmp, original_tmp, original_tmp);
+
+  return cv::sum(original_tmp).val[0];
+}
+
 float CORRELATION::compute_correlation_coefficient(const cv::Mat& original, const cv::Mat& processed, int white_x, int white_y, int white_width, int white_height) {
   cv::Mat original_tmp = original.clone();
   cv::Mat processed_tmp = processed.clone();

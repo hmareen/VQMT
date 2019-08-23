@@ -23,6 +23,10 @@ public:
     float compute_correlation_coefficient(const cv::Mat& original, const cv::Mat& processed, int h, int w);
     float compute_correlation_coefficient_binarized(const cv::Mat& original, const cv::Mat& processed, float factor_threshold_std);
 
+    float compute_eucl_dist_sq(const cv::Mat& original, const cv::Mat& processed);
+    float compute_eucl_dist_sq(const cv::Mat& original, const cv::Mat& processed, int h, int w);
+    float compute_eucl_dist_sq_subtract(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& subtract);
+
     float compute_correlation_linear_subtract(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& subtract);
     float compute_correlation_normalized_subtract(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& subtract);
     float compute_correlation_coefficient_subtract(const cv::Mat& original, const cv::Mat& processed, const cv::Mat& subtract);
