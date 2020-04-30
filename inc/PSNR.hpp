@@ -38,6 +38,7 @@ public:
 	PSNR(int height, int width);
 	// Compute the PSNR index of the processed image
     float compute(const cv::Mat& original, const cv::Mat& processed);
+    float compute(const cv::Mat& original, const cv::Mat& processed, int width, int height);
 	// Compute absolute error
 	float compute_abs_error(const cv::Mat& original, const cv::Mat& processed);
   float compute_abs_error(const cv::Mat& original, const cv::Mat& processed, int white_x, int white_y, int white_width, int white_height);

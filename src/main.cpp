@@ -159,12 +159,18 @@ enum Params {
 
 enum Metrics {
     METRIC_PSNR = 0,
+    METRIC_PSNR_U,
+    METRIC_PSNR_V,
 	METRIC_ABS_ERR,
   METRIC_MEAN_ABS_ERR,
   METRIC_ABS_ERR_WHITE,
     METRIC_SSIM,
+    METRIC_SSIM_U,
+    METRIC_SSIM_V,
     METRIC_MSSSIM,
     METRIC_VIFP,
+    METRIC_VIFP_U,
+    METRIC_VIFP_V,
     METRIC_PSNRHVS,
     METRIC_PSNRHVSM,
     METRIC_CORRELATION_LIN,
@@ -299,6 +305,16 @@ int main (int argc, const char *argv[])
 			sprintf(str, "%s_psnr.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_PSNR] = fopen(str, "w");
 		}
+    else if (strcmp(argv[i], "PSNR_U") == 0) {
+      sprintf(str, "%s_psnr_u.csv", argv[PARAM_RESULTS]);
+      result_file[METRIC_PSNR_U] = fopen(str, "w");
+      with_chroma = true;
+    }
+    else if (strcmp(argv[i], "PSNR_V") == 0) {
+      sprintf(str, "%s_psnr_v.csv", argv[PARAM_RESULTS]);
+      result_file[METRIC_PSNR_V] = fopen(str, "w");
+      with_chroma = true;
+    }
 		else if (strcmp(argv[i], "ABS_ERR") == 0) {
 			sprintf(str, "%s_abs_err.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_ABS_ERR] = fopen(str, "w");
@@ -328,6 +344,16 @@ int main (int argc, const char *argv[])
 			sprintf(str, "%s_ssim.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_SSIM] = fopen(str, "w");
 		}
+    else if (strcmp(argv[i], "SSIM_U") == 0) {
+      sprintf(str, "%s_ssim_u.csv", argv[PARAM_RESULTS]);
+      result_file[METRIC_SSIM_U] = fopen(str, "w");
+      with_chroma = true;
+    }
+    else if (strcmp(argv[i], "SSIM_V") == 0) {
+      sprintf(str, "%s_ssim_v.csv", argv[PARAM_RESULTS]);
+      result_file[METRIC_SSIM_V] = fopen(str, "w");
+      with_chroma = true;
+    }
 		else if (strcmp(argv[i], "MSSSIM") == 0) {
 			sprintf(str, "%s_msssim.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_MSSSIM] = fopen(str, "w");
@@ -345,6 +371,16 @@ int main (int argc, const char *argv[])
 			sprintf(str, "%s_vifp.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_VIFP] = fopen(str, "w");
 		}
+    else if (strcmp(argv[i], "VIFP_U") == 0) {
+      sprintf(str, "%s_vifp_u.csv", argv[PARAM_RESULTS]);
+      result_file[METRIC_VIFP_U] = fopen(str, "w");
+      with_chroma = true;
+    }
+    else if (strcmp(argv[i], "VIFP_V") == 0) {
+      sprintf(str, "%s_vifp_v.csv", argv[PARAM_RESULTS]);
+      result_file[METRIC_VIFP_V] = fopen(str, "w");
+      with_chroma = true;
+    }
 		else if (strcmp(argv[i], "PSNRHVS") == 0) {
 			sprintf(str, "%s_psnrhvs.csv", argv[PARAM_RESULTS]);
 			result_file[METRIC_PSNRHVS] = fopen(str, "w");
@@ -510,6 +546,12 @@ int main (int argc, const char *argv[])
 		fprintf(stderr, "VIFp: 'height' and 'width' have to be multiple of 8.\n");
 		exit(EXIT_FAILURE);
 	}
+  /*
+  if (result_file[METRIC_VIFP_U] != NULL && (height/2) % 8 != 0 || (width/2) % 8 != 0) {
+    fprintf(stderr, "VIFp U: U-channel 'height' and 'width' have to be multiple of 8.\n");
+    exit(EXIT_FAILURE);
+  }
+  */
 	// Check size for MS-SSIM downsampling
 	if (result_file[METRIC_MSSSIM] != NULL && (height % 16 != 0 || width % 16 != 0)) {
 		fprintf(stderr, "MS-SSIM: 'height' and 'width' have to be multiple of 16.\n");
@@ -561,8 +603,10 @@ int main (int argc, const char *argv[])
 
 	PSNR *psnr     = new PSNR(height, width);
 	SSIM *ssim     = new SSIM(height, width);
+  SSIM *ssim_u = new SSIM(height/2, width/2);
 	MSSSIM *msssim = new MSSSIM(height, width);
 	VIFP *vifp     = new VIFP(height, width);
+  VIFP *vifp_u = new VIFP(height/2, width/2);
 	PSNRHVS *phvs  = new PSNRHVS(height, width);
     CORRELATION *correlation = new CORRELATION(height, width);
     YUVDiff *yuvDiff = new YUVDiff(height, width);
@@ -646,6 +690,13 @@ int main (int argc, const char *argv[])
             result[METRIC_PSNR] = psnr->compute(original_frame, processed_frame);
 		}
 
+    if (result_file[METRIC_PSNR_U] != NULL) {
+      result[METRIC_PSNR_U] = psnr->compute(original_frame_chroma_u, processed_frame_chroma_u, u_width, u_height);
+    }
+    if (result_file[METRIC_PSNR_V] != NULL) {
+      result[METRIC_PSNR_V] = psnr->compute(original_frame_chroma_v, processed_frame_chroma_v, v_width, v_height);
+    }
+
 		if (result_file[METRIC_ABS_ERR] != NULL) {
 			result[METRIC_ABS_ERR] = psnr->compute_abs_error(original_frame, processed_frame);
 		}
@@ -672,6 +723,13 @@ int main (int argc, const char *argv[])
 		if (result_file[METRIC_SSIM] != NULL && result_file[METRIC_MSSSIM] == NULL) {
 			result[METRIC_SSIM] = ssim->compute(original_frame, processed_frame);
 		}
+    if (result_file[METRIC_SSIM_U] != NULL) {
+      result[METRIC_SSIM_U] = ssim->compute(original_frame_chroma_u, processed_frame_chroma_u);
+    }
+    if (result_file[METRIC_SSIM_V] != NULL) {
+      result[METRIC_SSIM_V] = ssim->compute(original_frame_chroma_v, processed_frame_chroma_v);
+    }
+
 		if (result_file[METRIC_MSSSIM] != NULL) {
 			msssim->compute(original_frame, processed_frame);
 			if (result_file[METRIC_SSIM] != NULL) {
@@ -690,6 +748,13 @@ int main (int argc, const char *argv[])
 		if (result_file[METRIC_VIFP] != NULL) {
 			result[METRIC_VIFP] = vifp->compute(original_frame, processed_frame);
 		}
+
+    if (result_file[METRIC_VIFP_U] != NULL) {
+      result[METRIC_VIFP_U] = vifp_u->compute(original_frame_chroma_u, processed_frame_chroma_u);
+    }
+    if (result_file[METRIC_VIFP_V] != NULL) {
+      result[METRIC_VIFP_V] = vifp_u->compute(original_frame_chroma_v, processed_frame_chroma_v);
+    }
 
 		// Compute PSNR-HVS and PSNR-HVS-M
 		if (result_file[METRIC_PSNRHVS] != NULL || result_file[METRIC_PSNRHVSM] != NULL) {
@@ -1132,7 +1197,7 @@ int main (int argc, const char *argv[])
 			result_avg[m] /= static_cast<float>(nbframes);
 			fprintf(result_file[m], "average,%.6f", static_cast<double>(result_avg[m]));
       // Also print to stdout
-      //printf("%.6f\n", static_cast<double>(result_avg[m]));
+      printf("%.6f\n", static_cast<double>(result_avg[m]));
 			fclose(result_file[m]);
 		}
 	}
