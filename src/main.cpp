@@ -635,6 +635,7 @@ int main (int argc, const char *argv[])
 
 	  float result[METRIC_SIZE_1_VALUE] = {0};
     float result_avg[METRIC_SIZE_1_VALUE] = { 0 };
+    bool result_non_inf[METRIC_SIZE_1_VALUE] = { false };
 
     int histBuffer[256] = { 0 };
     int maxHistBuffer[256] = { 0 };
@@ -1137,12 +1138,19 @@ int main (int argc, const char *argv[])
         }
 		// Print quality index to file
         for(int m = 0; m<METRIC_SIZE_1_VALUE; m++) {
-			if (result_file[m] != NULL) {
-				result_avg[m] += result[m];
-				//fprintf(result_file[m], "%d,%.6f\n", frame, static_cast<double>(result[m]));
-                fprintf(result_file[m], "%.6f\n", static_cast<double>(result[m]));
-			}
-		}
+			    if (result_file[m] != NULL) {
+            if (isinf(result[m])) { // Hannes: cap (PSNR) max value to 100. Otherwise if 1 frame is inf, then whole average is inf.
+              float cap_value = 100;
+              result_avg[m] += cap_value;
+            }
+            else {
+              result_non_inf[m] = true;
+              result_avg[m] += result[m];
+            }
+				    //fprintf(result_file[m], "%d,%.6f\n", frame, static_cast<double>(result[m]));
+            fprintf(result_file[m], "%.6f\n", static_cast<double>(result[m]));
+			    }
+		    }
 
         // Extra: print quality histogram to file
         if(result_file[METRIC_HIST] != NULL) {
@@ -1194,7 +1202,13 @@ int main (int argc, const char *argv[])
 	// Print average quality index to file
     for(int m = 0; m < METRIC_SIZE_1_VALUE; m++) {
 		if (result_file[m] != NULL) {
-			result_avg[m] /= static_cast<float>(nbframes);
+      if (result_non_inf[m]) {
+        result_avg[m] /= static_cast<float>(nbframes);
+      }
+      else {
+        //printf("TO INFINITY AND BEYOND");
+        result_avg[m] = INFINITY;
+      }
 			fprintf(result_file[m], "average,%.6f", static_cast<double>(result_avg[m]));
       // Also print to stdout
       printf("%.6f\n", static_cast<double>(result_avg[m]));
@@ -1280,7 +1294,7 @@ int main (int argc, const char *argv[])
 
 	duration = static_cast<double>(cv::getTickCount())-duration;
 	duration /= cv::getTickFrequency();
-	printf("Time: %0.3fs\n", duration);
+	//printf("Time: %0.3fs\n", duration);
 
 	return EXIT_SUCCESS;
 }
